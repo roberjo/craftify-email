@@ -6,6 +6,7 @@ import morgan from 'morgan';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
+import swaggerUi from 'swagger-ui-express';
 
 import { config } from './config';
 import { errorHandler } from './middleware/errorHandler';
@@ -13,6 +14,7 @@ import { notFoundHandler } from './middleware/notFoundHandler';
 import { apiRoutes } from './routes';
 import { initializeWebSocket } from './utils/websocket';
 import { logger } from './utils/logger';
+import { specs } from './config/swagger';
 
 // Load environment variables
 dotenv.config();
@@ -32,8 +34,15 @@ app.use(morgan('combined', { stream: { write: (message) => logger.info(message.t
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Swagger documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
+  explorer: true,
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'Craftify Email API Documentation',
+}));
+
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', (_, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
@@ -57,7 +66,8 @@ server.listen(PORT, () => {
   logger.info(`🚀 Server running on port ${PORT}`);
   logger.info(`📊 Environment: ${config.environment}`);
   logger.info(`🔗 Health check: http://localhost:${PORT}/health`);
-  logger.info(`📚 API docs: http://localhost:${PORT}/api/docs`);
+  logger.info(`📚 API docs: http://localhost:${PORT}/api`);
+  logger.info(`📖 Swagger UI: http://localhost:${PORT}/api-docs`);
 });
 
 // Graceful shutdown

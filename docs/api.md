@@ -7,9 +7,21 @@ The Craftify Email API provides a comprehensive set of endpoints for managing em
 ## Base URL
 
 ```
-Development: http://localhost:3001/api
-Production: https://api.craftify-email.com/api
+Development: http://localhost:3001
+Production: https://api.craftify-email.com
 ```
+
+## API Documentation
+
+### Swagger UI
+The API includes interactive documentation via Swagger UI:
+
+- **Development**: [http://localhost:3001/api-docs](http://localhost:3001/api-docs)
+- **Production**: [https://api.craftify-email.com/api-docs](https://api.craftify-email.com/api-docs)
+
+### OpenAPI Specification
+The API follows OpenAPI 3.0 specification and can be accessed at:
+- **JSON Format**: [http://localhost:3001/api-docs/swagger.json](http://localhost:3001/api-docs/swagger.json)
 
 ## Authentication
 
@@ -68,12 +80,65 @@ Content-Type: application/json
 }
 ```
 
-## Templates
+## Current Endpoints
 
-### Get Templates
+### Health Check
 
+#### Get Health Status
 ```http
-GET /templates
+GET /health
+```
+
+**Description**: Returns the current health status of the API
+
+**Response**:
+```json
+{
+  "status": "ok",
+  "timestamp": "2024-01-15T10:30:00Z",
+  "uptime": 146.259604245,
+  "environment": "development",
+  "version": "1.0.0"
+}
+```
+
+**Swagger Documentation**: Available in Swagger UI under "Health" tag
+
+### API Information
+
+#### Get API Info
+```http
+GET /api
+```
+
+**Description**: Returns basic information about the API
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "name": "Craftify Email API",
+    "version": "1.0.0",
+    "description": "Email Template Management System API",
+    "endpoints": {
+      "health": "/health",
+      "api": "/api",
+      "swagger": "/api-docs"
+    }
+  }
+}
+```
+
+**Swagger Documentation**: Available in Swagger UI under "API Info" tag
+
+## Planned Endpoints
+
+### Templates
+
+#### Get Templates
+```http
+GET /api/templates
 ```
 
 **Query Parameters:**
@@ -125,10 +190,9 @@ GET /templates
 }
 ```
 
-### Get Template by ID
-
+#### Get Template by ID
 ```http
-GET /templates/{id}
+GET /api/templates/{id}
 ```
 
 **Response:**
@@ -158,10 +222,9 @@ GET /templates/{id}
 }
 ```
 
-### Create Template
-
+#### Create Template
 ```http
-POST /templates
+POST /api/templates
 ```
 
 **Request Body:**
@@ -203,10 +266,9 @@ POST /templates
 }
 ```
 
-### Update Template
-
+#### Update Template
 ```http
-PUT /templates/{id}
+PUT /api/templates/{id}
 ```
 
 **Request Body:**
@@ -221,10 +283,9 @@ PUT /templates/{id}
 }
 ```
 
-### Delete Template
-
+#### Delete Template
 ```http
-DELETE /templates/{id}
+DELETE /api/templates/{id}
 ```
 
 **Response:**
@@ -238,10 +299,9 @@ DELETE /templates/{id}
 }
 ```
 
-### Duplicate Template
-
+#### Duplicate Template
 ```http
-POST /templates/{id}/duplicate
+POST /api/templates/{id}/duplicate
 ```
 
 **Request Body:**
@@ -252,12 +312,11 @@ POST /templates/{id}/duplicate
 }
 ```
 
-## Template Versions
+### Template Versions
 
-### Get Template Versions
-
+#### Get Template Versions
 ```http
-GET /templates/{id}/versions
+GET /api/templates/{id}/versions
 ```
 
 **Response:**
@@ -283,16 +342,14 @@ GET /templates/{id}/versions
 }
 ```
 
-### Get Specific Version
-
+#### Get Specific Version
 ```http
-GET /templates/{id}/versions/{version}
+GET /api/templates/{id}/versions/{version}
 ```
 
-### Restore Version
-
+#### Restore Version
 ```http
-POST /templates/{id}/restore/{version}
+POST /api/templates/{id}/restore/{version}
 ```
 
 **Request Body:**
@@ -302,12 +359,11 @@ POST /templates/{id}/restore/{version}
 }
 ```
 
-## Folders
+### Folders
 
-### Get Folders
-
+#### Get Folders
 ```http
-GET /folders?domain={domain}
+GET /api/folders?domain={domain}
 ```
 
 **Response:**
@@ -329,10 +385,9 @@ GET /folders?domain={domain}
 }
 ```
 
-### Create Folder
-
+#### Create Folder
 ```http
-POST /folders
+POST /api/folders
 ```
 
 **Request Body:**
@@ -345,24 +400,21 @@ POST /folders
 }
 ```
 
-### Update Folder
-
+#### Update Folder
 ```http
-PUT /folders/{id}
+PUT /api/folders/{id}
 ```
 
-### Delete Folder
-
+#### Delete Folder
 ```http
-DELETE /folders/{id}
+DELETE /api/folders/{id}
 ```
 
-## Approval Workflow
+### Approval Workflow
 
-### Request Approval
-
+#### Request Approval
 ```http
-POST /templates/{id}/request-approval
+POST /api/templates/{id}/request-approval
 ```
 
 **Request Body:**
@@ -390,10 +442,9 @@ POST /templates/{id}/request-approval
 }
 ```
 
-### Approve Template
-
+#### Approve Template
 ```http
-POST /templates/{id}/approve
+POST /api/templates/{id}/approve
 ```
 
 **Request Body:**
@@ -403,10 +454,9 @@ POST /templates/{id}/approve
 }
 ```
 
-### Reject Template
-
+#### Reject Template
 ```http
-POST /templates/{id}/reject
+POST /api/templates/{id}/reject
 ```
 
 **Request Body:**
@@ -416,18 +466,16 @@ POST /templates/{id}/reject
 }
 ```
 
-### Get Approval Requests
-
+#### Get Approval Requests
 ```http
-GET /approvals?status=pending&domain={domain}
+GET /api/approvals?status=pending&domain={domain}
 ```
 
-## Bulk Operations
+### Bulk Operations
 
-### Bulk Action
-
+#### Bulk Action
 ```http
-POST /templates/bulk
+POST /api/templates/bulk
 ```
 
 **Request Body:**
@@ -471,12 +519,11 @@ POST /templates/bulk
 }
 ```
 
-## Components
+### Components
 
-### Get Components
-
+#### Get Components
 ```http
-GET /components?domain={domain}&type={type}
+GET /api/components?domain={domain}&type={type}
 ```
 
 **Response:**
@@ -498,30 +545,26 @@ GET /components?domain={domain}&type={type}
 }
 ```
 
-### Create Component
-
+#### Create Component
 ```http
-POST /components
+POST /api/components
 ```
 
-### Update Component
-
+#### Update Component
 ```http
-PUT /components/{id}
+PUT /api/components/{id}
 ```
 
-### Delete Component
-
+#### Delete Component
 ```http
-DELETE /components/{id}
+DELETE /api/components/{id}
 ```
 
-## Testing & Preview
+### Testing & Preview
 
-### Send Test Email
-
+#### Send Test Email
 ```http
-POST /templates/{id}/send-test
+POST /api/templates/{id}/send-test
 ```
 
 **Request Body:**
@@ -535,10 +578,9 @@ POST /templates/{id}/send-test
 }
 ```
 
-### Preview Template
-
+#### Preview Template
 ```http
-POST /templates/{id}/preview
+POST /api/templates/{id}/preview
 ```
 
 **Request Body:**
@@ -567,12 +609,11 @@ POST /templates/{id}/preview
 }
 ```
 
-## Audit & Analytics
+### Audit & Analytics
 
-### Get Audit Logs
-
+#### Get Audit Logs
 ```http
-GET /audit-logs?entityId={id}&userId={userId}&action={action}&startDate={date}&endDate={date}
+GET /api/audit-logs?entityId={id}&userId={userId}&action={action}&startDate={date}&endDate={date}
 ```
 
 **Response:**
@@ -600,10 +641,9 @@ GET /audit-logs?entityId={id}&userId={userId}&action={action}&startDate={date}&e
 }
 ```
 
-### Get Analytics
-
+#### Get Analytics
 ```http
-GET /analytics/template-usage?domain={domain}&startDate={date}&endDate={date}
+GET /api/analytics/template-usage?domain={domain}&startDate={date}&endDate={date}
 ```
 
 **Response:**
@@ -641,7 +681,7 @@ GET /analytics/template-usage?domain={domain}&startDate={date}&endDate={date}
 ### Connection
 
 ```javascript
-const ws = new WebSocket('wss://api.craftify-email.com/ws');
+const ws = new WebSocket('ws://localhost:3001');
 
 ws.onopen = () => {
   // Authenticate with JWT token
@@ -762,4 +802,67 @@ curl -X POST \
      -H "Content-Type: application/json" \
      -d '{"domain":"marketing","name":"Test","subject":"Test"}' \
      "https://api.craftify-email.com/api/templates"
-``` 
+```
+
+## Development and Testing
+
+### Local Development
+```bash
+# Start the API server
+cd apps/api
+npm run dev
+
+# The API will be available at:
+# - API: http://localhost:3001
+# - Health: http://localhost:3001/health
+# - Swagger UI: http://localhost:3001/api-docs
+```
+
+### Testing Endpoints
+```bash
+# Health check
+curl http://localhost:3001/health
+
+# API info
+curl http://localhost:3001/api
+
+# Swagger documentation
+open http://localhost:3001/api-docs
+```
+
+## Current Implementation Status
+
+### ✅ **Implemented**
+- **Health Check Endpoint**: `/health` - Returns system status
+- **API Info Endpoint**: `/api` - Returns API information
+- **Swagger Documentation**: `/api-docs` - Interactive API documentation
+- **WebSocket Server**: Basic WebSocket support for real-time features
+- **Error Handling**: Basic error handling middleware
+- **Logging**: Request logging with Morgan
+- **CORS**: Cross-origin resource sharing configuration
+- **Security**: Helmet.js security headers
+
+### 🚧 **In Progress**
+- **Template Management**: CRUD operations for email templates
+- **Authentication**: JWT-based authentication system
+- **Validation**: Request/response validation with Zod
+
+### 📋 **Planned**
+- **Folder Management**: Template organization system
+- **Approval Workflow**: Multi-stage approval process
+- **Bulk Operations**: Mass template management
+- **Component System**: Reusable template components
+- **Testing Infrastructure**: Unit and integration tests
+- **Database Integration**: DynamoDB connection
+- **Real-time Features**: Advanced WebSocket functionality
+
+## Next Steps
+
+1. **Complete Template CRUD**: Implement all template management endpoints
+2. **Add Authentication**: Implement JWT-based authentication
+3. **Database Integration**: Connect to DynamoDB
+4. **Testing**: Add comprehensive test coverage
+5. **Documentation**: Complete OpenAPI specification
+6. **Deployment**: Set up production deployment pipeline
+
+The API is now running locally with basic endpoints and comprehensive Swagger documentation. You can explore the interactive API documentation at [http://localhost:3001/api-docs](http://localhost:3001/api-docs) to see all available endpoints and test them directly from the browser. 
