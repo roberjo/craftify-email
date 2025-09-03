@@ -1,976 +1,1054 @@
-# Deployment Guide
+# 🚀 Deployment Guide
 
-## Overview
+## 📋 **Table of Contents**
 
-This guide covers the deployment process for Craftify Email, including infrastructure setup, CI/CD pipelines, monitoring, and production considerations.
+- [🌟 Overview](#-overview)
+- [🔒 Security Configuration](#-security-configuration)
+- [📊 Monitoring & Logging](#-monitoring--logging)
+- [🐳 Docker Deployment](#-docker-deployment)
+- [☸️ Kubernetes Deployment](#️-kubernetes-deployment)
+- [☁️ Cloud Deployment](#️-cloud-deployment)
+- [🔧 Environment Configuration](#️-environment-configuration)
+- [📈 Performance Optimization](#-performance-optimization)
 
-## Infrastructure Architecture
+## 🌟 **Overview**
 
-### Target Infrastructure
+This guide covers deploying the Craftify Email API with enterprise-grade security, comprehensive monitoring, and production-ready infrastructure. The deployment process ensures security compliance, high availability, and optimal performance.
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   CDN           │    │   Load          │    │   Application  │
-│   (CloudFront)  │◄──►│   Balancer      │◄──►│   Servers      │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   S3 Bucket     │    │   Auto Scaling  │    │   ECS/Fargate   │
-│   (Static)      │    │   Group         │    │   Containers    │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
+### **🎯 Deployment Goals**
 
-### AWS Services
+- **🔒 Security First**: OWASP Top 10 compliant deployment
+- **📊 Observability**: Comprehensive logging and monitoring
+- **🚀 Performance**: High-performance, scalable infrastructure
+- **🔄 Reliability**: High availability with automated failover
+- **📈 Scalability**: Auto-scaling based on demand
 
-- **Frontend**: S3 + CloudFront for static hosting
-- **Backend**: ECS/Fargate for containerized API
-- **Database**: DynamoDB for data storage
-- **Caching**: ElastiCache Redis for session and data caching
-- **Monitoring**: CloudWatch for metrics and logging
-- **Security**: WAF, IAM, and Secrets Manager
+## 🔒 **Security Configuration**
 
-## Environment Configuration
+### **Production Security Settings**
 
-### Environment Variables
-
-#### Frontend (.env.production)
+#### **1. Environment Variables**
 ```bash
-VITE_API_BASE_URL=https://api.craftify-email.com
-VITE_APP_NAME=Craftify Email
-VITE_APP_VERSION=1.0.0
-VITE_SENTRY_DSN=https://your-sentry-dsn
-VITE_ANALYTICS_ID=G-XXXXXXXXXX
-```
-
-#### Backend (.env.production)
-```bash
+# Security Configuration
 NODE_ENV=production
-PORT=3001
-CORS_ORIGIN=https://craftify-email.com
-JWT_SECRET=your-jwt-secret
-OKTA_ISSUER=https://your-domain.okta.com
-OKTA_CLIENT_ID=your-client-id
-OKTA_CLIENT_SECRET=your-client-secret
-DYNAMODB_REGION=us-east-1
-REDIS_URL=redis://your-redis-endpoint
-SENTRY_DSN=https://your-sentry-dsn
+ENABLE_SECURITY_FEATURES=true
+ENABLE_RATE_LIMITING=true
+ENABLE_IP_FILTERING=true
+ENABLE_GEO_BLOCKING=true
+
+# CORS Configuration
+CORS_ORIGIN=https://app.craftify-email.com,https://admin.craftify-email.com
+CORS_CREDENTIALS=true
+CORS_MAX_AGE=86400
+
+# Rate Limiting
+RATE_LIMIT_MAX=100
+RATE_LIMIT_WINDOW_MS=900000
+AUTH_RATE_LIMIT_MAX=5
+AUTH_RATE_LIMIT_WINDOW_MS=900000
+
+# IP Filtering
+ENABLE_IP_WHITELIST=false
+ENABLE_IP_BLACKLIST=true
+IP_BLACKLIST=192.168.1.100,10.0.0.50
+ALLOWED_COUNTRIES=US,CA,GB,DE,FR,AU
+
+# Security Headers
+ENABLE_CSP=true
+ENABLE_HSTS=true
+ENABLE_FRAME_GUARD=true
+ENABLE_XSS_PROTECTION=true
 ```
 
-### Configuration Management
-
-#### AWS Systems Manager Parameter Store
-```bash
-# Store sensitive configuration
-aws ssm put-parameter \
-  --name "/craftify-email/production/jwt-secret" \
-  --value "your-secret-value" \
-  --type "SecureString"
-
-# Retrieve in application
-aws ssm get-parameter \
-  --name "/craftify-email/production/jwt-secret" \
-  --with-decryption
+#### **2. Security Headers Configuration**
+```typescript
+// Production security headers
+const productionSecurityConfig = {
+  helmet: {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "https://fonts.googleapis.com"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'", "wss:"],
+        frameSrc: ["'none'"],
+        objectSrc: ["'none'"]
+      }
+    },
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true
+    },
+    frameguard: { action: 'deny' },
+    noSniff: true,
+    xssFilter: true
+  },
+  cors: {
+    origin: ['https://app.craftify-email.com'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    allowedHeaders: [
+      'Origin', 'X-Requested-With', 'Content-Type', 'Accept',
+      'Authorization', 'X-API-Key', 'X-Request-ID'
+    ]
+  }
+};
 ```
 
-## Containerization
+#### **3. Rate Limiting Configuration**
+```typescript
+// Production rate limiting
+const productionRateLimitConfig = {
+  global: {
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100,                   // 100 requests per IP
+    message: 'Rate limit exceeded',
+    standardHeaders: true,
+    legacyHeaders: false
+  },
+  authentication: {
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5,                     // 5 attempts per IP
+    message: 'Too many authentication attempts'
+  },
+  api: {
+    windowMs: 1 * 60 * 1000,  // 1 minute
+    max: 30,                    // 30 requests per IP
+    message: 'API rate limit exceeded'
+  }
+};
+```
 
-### Docker Configuration
+### **Security Hardening Checklist**
 
-#### Frontend Dockerfile
+- [ ] **HTTPS/TLS**: SSL certificates configured and valid
+- [ ] **Security Headers**: All security headers enabled
+- [ ] **Rate Limiting**: Multi-tier rate limiting active
+- [ ] **IP Filtering**: Blacklist and whitelist configured
+- [ ] **Input Validation**: All endpoints validate input
+- [ ] **Authentication**: JWT tokens with proper expiration
+- [ ] **Authorization**: Role-based access control active
+- [ ] **Audit Logging**: Security events logged and monitored
+- [ ] **Dependency Scanning**: Regular security updates
+- [ ] **Penetration Testing**: Security testing completed
+
+## 📊 **Monitoring & Logging**
+
+### **Production Logging Configuration**
+
+#### **1. Winston Logger Setup**
+```typescript
+// Production logging configuration
+const productionLoggerConfig = {
+  level: 'warn',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.errors({ stack: true }),
+    winston.format.json()
+  ),
+  transports: [
+    // Application logs
+    new DailyRotateFile({
+      filename: 'logs/application-%DATE%.log',
+      datePattern: 'YYYY-MM-DD',
+      maxSize: '20m',
+      maxFiles: '30d',
+      zippedArchive: true
+    }),
+    // Error logs
+    new DailyRotateFile({
+      filename: 'logs/error-%DATE%.log',
+      datePattern: 'YYYY-MM-DD',
+      maxSize: '20m',
+      maxFiles: '90d',
+      zippedArchive: true,
+      level: 'error'
+    }),
+    // Security logs
+    new DailyRotateFile({
+      filename: 'logs/security-%DATE%.log',
+      datePattern: 'YYYY-MM-DD',
+      maxSize: '20m',
+      maxFiles: '365d',
+      zippedArchive: true,
+      level: 'warn'
+    })
+  ]
+};
+```
+
+#### **2. CloudWatch Integration**
+```typescript
+// AWS CloudWatch configuration
+const cloudWatchConfig = {
+  logGroupName: 'craftify-api-logs',
+  logStreamName: `${process.env.NODE_ENV}-${process.env.APP_VERSION}`,
+  region: process.env.AWS_REGION || 'us-east-1',
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+  }
+};
+
+// CloudWatch transport
+const cloudWatchTransport = new winston.transports.CloudWatch(cloudWatchConfig);
+```
+
+#### **3. Health Check Endpoints**
+```typescript
+// Comprehensive health checks
+app.get('/health', (_, res) => {
+  const healthData = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: config.environment,
+    version: config.version,
+    services: {
+      database: checkDatabaseHealth(),
+      redis: checkRedisHealth(),
+      websocket: checkWebSocketHealth(),
+      external: checkExternalServices()
+    },
+    system: {
+      memory: process.memoryUsage(),
+      cpu: process.cpuUsage(),
+      platform: process.platform,
+      nodeVersion: process.version
+    }
+  };
+  
+  res.json(healthData);
+});
+
+// Detailed health check for Kubernetes
+app.get('/health/detailed', async (_, res) => {
+  try {
+    const detailedHealth = await performDetailedHealthCheck();
+    res.json(detailedHealth);
+  } catch (error) {
+    res.status(503).json({
+      status: 'error',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+```
+
+### **Monitoring Dashboard Configuration**
+
+#### **1. Key Metrics to Monitor**
+- **Performance Metrics**
+  - API response times (p50, p95, p99)
+  - Request throughput (RPS)
+  - Error rates and types
+  - Database query performance
+
+- **Security Metrics**
+  - Failed authentication attempts
+  - Rate limit violations
+  - Blocked IP addresses
+  - Security event frequency
+
+- **System Metrics**
+  - CPU and memory utilization
+  - Disk I/O and network usage
+  - Container health and restart counts
+  - External service availability
+
+#### **2. Alerting Configuration**
+```typescript
+// Alert thresholds
+const alertThresholds = {
+  responseTime: {
+    warning: 1000,    // 1 second
+    critical: 5000    // 5 seconds
+  },
+  errorRate: {
+    warning: 5,       // 5%
+    critical: 10      // 10%
+  },
+  memoryUsage: {
+    warning: 80,      // 80%
+    critical: 90      // 90%
+  },
+  cpuUsage: {
+    warning: 70,      // 70%
+    critical: 85      // 85%
+  }
+};
+```
+
+## 🐳 **Docker Deployment**
+
+### **Multi-stage Docker Build**
+
+#### **1. API Dockerfile**
 ```dockerfile
-# Frontend Dockerfile
+# Multi-stage build for API
+FROM node:18-alpine AS builder
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY tsconfig*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy source code
+COPY src/ ./src/
+
+# Build application
+RUN npm run build
+
+# Production runtime
+FROM node:18-alpine AS runtime
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nodejs -u 1001
+
+# Set working directory
+WORKDIR /app
+
+# Copy built application
+COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
+
+# Create logs directory
+RUN mkdir -p logs && chown nodejs:nodejs logs
+
+# Switch to non-root user
+USER nodejs
+
+# Expose port
+EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node dist/health-check.js
+
+# Start application with dumb-init
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "dist/index.js"]
+```
+
+#### **2. Web Application Dockerfile**
+```dockerfile
+# Multi-stage build for web application
 FROM node:18-alpine AS builder
 
 WORKDIR /app
+
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 
 COPY . .
 RUN npm run build
 
-FROM nginx:alpine
+# Production runtime with nginx
+FROM nginx:alpine AS runtime
+
+# Copy built application
 COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
 
+# Expose port
 EXPOSE 80
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost/ || exit 1
+
 CMD ["nginx", "-g", "daemon off;"]
 ```
 
-#### Backend Dockerfile
-```dockerfile
-# Backend Dockerfile
-FROM node:18-alpine AS builder
-
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-
-COPY . .
-RUN npm run build
-
-FROM node:18-alpine
-WORKDIR /app
-
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package*.json ./
-RUN npm ci --only=production
-
-EXPOSE 3001
-CMD ["npm", "start"]
-```
-
-#### Docker Compose (Development)
+#### **3. Docker Compose Configuration**
 ```yaml
-# docker-compose.yml
 version: '3.8'
 
 services:
-  frontend:
-    build: ./apps/web
-    ports:
-      - "3000:80"
-    environment:
-      - VITE_API_BASE_URL=http://localhost:3001
-    depends_on:
-      - backend
-
-  backend:
-    build: ./apps/api
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
     ports:
       - "3001:3001"
     environment:
-      - NODE_ENV=development
-      - PORT=3001
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+    volumes:
+      - ./logs:/app/logs
     depends_on:
       - redis
-      - dynamodb-local
+      - database
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
 
-  dynamodb-local:
-    image: amazon/dynamodb-local
+  database:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgres_data:
+```
+
+## ☸️ **Kubernetes Deployment**
+
+### **Kubernetes Manifests**
+
+#### **1. API Deployment**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: craftify-api
+  namespace: craftify
+  labels:
+    app: craftify-api
+    version: v1.0.0
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: craftify-api
+  template:
+    metadata:
+      labels:
+        app: craftify-api
+        version: v1.0.0
+    spec:
+      serviceAccountName: craftify-api-sa
+      containers:
+      - name: api
+        image: craftify/api:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3001
+          name: http
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3001"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: craftify-secrets
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: craftify-secrets
+              key: redis-url
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 3001
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1001
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: logs
+        emptyDir: {}
+      securityContext:
+        fsGroup: 1001
+```
+
+#### **2. API Service**
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: craftify-api-service
+  namespace: craftify
+  labels:
+    app: craftify-api
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 3001
+    protocol: TCP
+    name: http
+  selector:
+    app: craftify-api
+```
+
+#### **3. Ingress Configuration**
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: craftify-api-ingress
+  namespace: craftify
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "15m"
+spec:
+  tls:
+  - hosts:
+    - api.craftify-email.com
+    secretName: craftify-api-tls
+  rules:
+  - host: api.craftify-email.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: craftify-api-service
+            port:
+              number: 80
+```
+
+#### **4. Horizontal Pod Autoscaler**
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: craftify-api-hpa
+  namespace: craftify
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: craftify-api
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+```
+
+### **Kubernetes Security Configuration**
+
+#### **1. Network Policies**
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: craftify-api-network-policy
+  namespace: craftify
+spec:
+  podSelector:
+    matchLabels:
+      app: craftify-api
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
     ports:
-      - "8000:8000"
-    command: "-jar DynamoDBLocal.jar -sharedDb"
+    - protocol: TCP
+      port: 3001
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: database
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: redis
+    ports:
+    - protocol: TCP
+      port: 6379
 ```
 
-## CI/CD Pipeline
-
-### GitHub Actions Workflow
-
-#### Main Pipeline
+#### **2. Pod Security Standards**
 ```yaml
-# .github/workflows/deploy.yml
-name: Deploy to Production
-
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
-
-env:
-  AWS_REGION: us-east-1
-  ECR_REPOSITORY: craftify-email
-  ECS_CLUSTER: craftify-email-cluster
-  ECS_SERVICE: craftify-email-service
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-          cache: 'npm'
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Run tests
-        run: npm run test:ci
-      
-      - name: Run linting
-        run: npm run lint
-      
-      - name: Type check
-        run: npm run type-check
-
-  build-and-push:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-      
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-      
-      - name: Build and push frontend image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-frontend:$IMAGE_TAG ./apps/web
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY-frontend:$IMAGE_TAG
-      
-      - name: Build and push backend image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-backend:$IMAGE_TAG ./apps/api
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY-backend:$IMAGE_TAG
-
-  deploy:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-      
-      - name: Deploy to ECS
-        run: |
-          aws ecs update-service \
-            --cluster $ECS_CLUSTER \
-            --service $ECS_SERVICE \
-            --force-new-deployment
-      
-      - name: Wait for deployment
-        run: |
-          aws ecs wait services-stable \
-            --cluster $ECS_CLUSTER \
-            --services $ECS_SERVICE
-      
-      - name: Invalidate CloudFront
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/*"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: craftify-api-pod
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1001
+    fsGroup: 1001
+  containers:
+  - name: api
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+        - ALL
+      seccompProfile:
+        type: RuntimeDefault
 ```
 
-#### Staging Pipeline
-```yaml
-# .github/workflows/staging.yml
-name: Deploy to Staging
+## ☁️ **Cloud Deployment**
 
-on:
-  push:
-    branches: [develop]
-  pull_request:
-    branches: [main]
+### **AWS Deployment**
 
-jobs:
-  deploy-staging:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Deploy to staging environment
-        run: |
-          # Deploy to staging environment
-          echo "Deploying to staging..."
-```
-
-### Deployment Strategies
-
-#### Blue-Green Deployment
-```yaml
-# ECS Blue-Green deployment configuration
-{
-  "deploymentController": {
-    "type": "CODE_DEPLOY"
-  },
-  "deploymentConfiguration": {
-    "deploymentCircuitBreaker": {
-      "enable": true,
-      "rollback": true
-    },
-    "maximumPercent": 200,
-    "minimumHealthyPercent": 50
-  }
-}
-```
-
-#### Rolling Deployment
-```yaml
-# Rolling deployment configuration
-{
-  "deploymentConfiguration": {
-    "maximumPercent": 200,
-    "minimumHealthyPercent": 50
-  }
-}
-```
-
-## Infrastructure as Code
-
-### Terraform Configuration
-
-#### Main Infrastructure
-```hcl
-# infrastructure/main.tf
-terraform {
-  required_version = ">= 1.0"
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-}
-
-provider "aws" {
-  region = var.aws_region
-}
-
-# VPC and networking
-module "vpc" {
-  source = "./modules/vpc"
-  
-  environment = var.environment
-  vpc_cidr   = var.vpc_cidr
-}
-
-# ECS cluster
-module "ecs" {
-  source = "./modules/ecs"
-  
-  environment     = var.environment
-  vpc_id         = module.vpc.vpc_id
-  private_subnets = module.vpc.private_subnets
-}
-
-# DynamoDB tables
-module "dynamodb" {
-  source = "./modules/dynamodb"
-  
-  environment = var.environment
-  tables     = var.dynamodb_tables
-}
-
-# CloudFront distribution
-module "cloudfront" {
-  source = "./modules/cloudfront"
-  
-  environment = var.environment
-  domain_name = var.domain_name
-  s3_bucket   = module.s3.bucket_name
-}
-```
-
-#### ECS Service Module
-```hcl
-# infrastructure/modules/ecs/main.tf
-resource "aws_ecs_service" "main" {
-  name            = "${var.environment}-craftify-email"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.main.arn
-  desired_count   = var.desired_count
-  launch_type     = "FARGATE"
-
-  network_configuration {
-    subnets          = var.private_subnets
-    security_groups  = [aws_security_group.ecs.id]
-    assign_public_ip = false
-  }
-
-  load_balancer {
-    target_group_arn = aws_lb_target_group.main.arn
-    container_name   = "app"
-    container_port   = 3001
-  }
-
-  deployment_controller {
-    type = "ECS"
-  }
-
-  deployment_configuration {
-    maximum_percent         = 200
-    minimum_healthy_percent = 50
-  }
-
-  depends_on = [aws_lb_listener.main]
-}
-```
-
-### CloudFormation Templates
-
-#### DynamoDB Tables
-```yaml
-# infrastructure/cloudformation/dynamodb.yml
-AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Craftify Email DynamoDB Tables'
-
-Resources:
-  EmailTemplatesTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: !Sub '${Environment}-email-templates'
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: PK
-          AttributeType: S
-        - AttributeName: SK
-          AttributeType: S
-        - AttributeName: GSI1PK
-          AttributeType: S
-        - AttributeName: GSI1SK
-          AttributeType: S
-      KeySchema:
-        - AttributeName: PK
-          KeyType: HASH
-        - AttributeName: SK
-          KeyType: RANGE
-      GlobalSecondaryIndexes:
-        - IndexName: GSI1
-          KeySchema:
-            - AttributeName: GSI1PK
-              KeyType: HASH
-            - AttributeName: GSI1SK
-              KeyType: RANGE
-          Projection:
-            ProjectionType: ALL
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Application
-          Value: craftify-email
-```
-
-## Monitoring and Observability
-
-### Application Monitoring
-
-#### Sentry Integration
-```typescript
-// src/lib/monitoring.ts
-import * as Sentry from '@sentry/react';
-
-export const initializeMonitoring = () => {
-  Sentry.init({
-    dsn: import.meta.env.VITE_SENTRY_DSN,
-    environment: import.meta.env.VITE_APP_ENV,
-    release: import.meta.env.VITE_APP_VERSION,
-    
-    // Performance monitoring
-    tracesSampleRate: 0.1,
-    
-    // Session tracking
-    autoSessionTracking: true,
-    
-    // Error filtering
-    beforeSend(event) {
-      // Filter out certain errors
-      if (event.exception) {
-        const exception = event.exception.values?.[0];
-        if (exception?.value?.includes('ResizeObserver')) {
-          return null;
-        }
-      }
-      return event;
-    },
-  });
-};
-
-export const captureError = (error: Error, context?: Record<string, any>) => {
-  Sentry.captureException(error, { extra: context });
-};
-
-export const captureMessage = (message: string, level: Sentry.SeverityLevel = 'info') => {
-  Sentry.captureMessage(message, level);
-};
-```
-
-#### Performance Monitoring
-```typescript
-// src/lib/performance.ts
-export const trackPageLoad = () => {
-  if ('performance' in window) {
-    const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
-    
-    const metrics = {
-      dns: navigation.domainLookupEnd - navigation.domainLookupStart,
-      tcp: navigation.connectEnd - navigation.connectStart,
-      ttfb: navigation.responseStart - navigation.requestStart,
-      domContentLoaded: navigation.domContentLoadedEventEnd - navigation.domContentLoadedEventStart,
-      load: navigation.loadEventEnd - navigation.loadEventStart,
-    };
-
-    // Send to analytics
-    trackEvent('page_load_performance', metrics);
-  }
-};
-
-export const trackUserInteraction = (action: string, duration: number) => {
-  trackEvent('user_interaction', { action, duration });
-};
-```
-
-### Infrastructure Monitoring
-
-#### CloudWatch Dashboards
+#### **1. ECS Task Definition**
 ```json
 {
-  "widgets": [
+  "family": "craftify-api",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::123456789012:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::123456789012:role/ecsTaskRole",
+  "containerDefinitions": [
     {
-      "type": "metric",
-      "properties": {
-        "metrics": [
-          ["AWS/ECS", "CPUUtilization", "ServiceName", "craftify-email"],
-          ["AWS/ECS", "MemoryUtilization", "ServiceName", "craftify-email"]
-        ],
-        "period": 300,
-        "stat": "Average",
-        "region": "us-east-1",
-        "title": "ECS Service Metrics"
-      }
-    },
-    {
-      "type": "metric",
-      "properties": {
-        "metrics": [
-          ["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", "craftify-email-lb"],
-          ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", "craftify-email-lb"]
-        ],
-        "period": 300,
-        "stat": "Average",
-        "region": "us-east-1",
-        "title": "Load Balancer Metrics"
+      "name": "api",
+      "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/craftify-api:latest",
+      "portMappings": [
+        {
+          "containerPort": 3001,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "NODE_ENV",
+          "value": "production"
+        },
+        {
+          "name": "PORT",
+          "value": "3001"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:123456789012:secret:craftify/database-url"
+        },
+        {
+          "name": "REDIS_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:123456789012:secret:craftify/redis-url"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/craftify-api",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:3001/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
       }
     }
   ]
 }
 ```
 
-#### Log Aggregation
+#### **2. Application Load Balancer**
+```yaml
+# ALB configuration
+Resources:
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: craftify-api-alb
+      Scheme: internet-facing
+      Type: application
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS-1-2-2017-01
+      Certificates:
+        - CertificateArn: !Ref SSLCertificate
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref APITargetGroup
+
+  APITargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: craftify-api-tg
+      Port: 3001
+      Protocol: HTTP
+      VpcId: !Ref VPC
+      TargetType: ip
+      HealthCheckPath: /health
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+```
+
+### **Azure Deployment**
+
+#### **1. Azure Container Instances**
+```yaml
+apiVersion: 2019-12-01
+location: eastus
+name: craftify-api
+properties:
+  containers:
+  - name: api
+    properties:
+      image: craftify/api:latest
+      ports:
+      - port: 3001
+        protocol: TCP
+      environmentVariables:
+      - name: NODE_ENV
+        value: "production"
+      - name: PORT
+        value: "3001"
+      resources:
+        requests:
+          memoryInGB: 1.0
+          cpu: 0.5
+        limits:
+          memoryInGB: 2.0
+          cpu: 1.0
+      volumeMounts:
+      - name: logs
+        mountPath: /app/logs
+  volumes:
+  - name: logs
+    azureFile:
+      shareName: logs
+      storageAccountName: craftifystorage
+  osType: Linux
+  restartPolicy: Always
+  ipAddress:
+    type: Public
+    ports:
+    - protocol: TCP
+      port: 3001
+    dnsNameLabel: craftify-api
+```
+
+## 🔧 **Environment Configuration**
+
+### **Configuration Management**
+
+#### **1. Environment-specific Configs**
 ```typescript
-// src/lib/logging.ts
-export const logger = {
-  info: (message: string, context?: Record<string, any>) => {
-    const logEntry = {
-      level: 'info',
-      message,
-      context,
-      timestamp: new Date().toISOString(),
-      environment: import.meta.env.VITE_APP_ENV,
-    };
-    
-    console.log(JSON.stringify(logEntry));
-    
-    // Send to CloudWatch Logs in production
-    if (import.meta.env.VITE_APP_ENV === 'production') {
-      // CloudWatch Logs integration
+// Configuration by environment
+const environmentConfigs = {
+  development: {
+    security: {
+      cors: { origin: '*' },
+      rateLimit: { max: 1000 },
+      logging: { level: 'debug' }
+    },
+    database: {
+      url: 'postgresql://localhost:5432/craftify_dev',
+      pool: { min: 1, max: 5 }
     }
   },
-  
-  error: (message: string, error?: Error, context?: Record<string, any>) => {
-    const logEntry = {
-      level: 'error',
-      message,
-      error: error?.message,
-      stack: error?.stack,
-      context,
-      timestamp: new Date().toISOString(),
-      environment: import.meta.env.VITE_APP_ENV,
-    };
-    
-    console.error(JSON.stringify(logEntry));
-    
-    // Send to error monitoring
-    if (import.meta.env.VITE_APP_ENV === 'production') {
-      captureError(error || new Error(message), context);
+  staging: {
+    security: {
+      cors: { origin: ['https://staging.craftify-email.com'] },
+      rateLimit: { max: 500 },
+      logging: { level: 'info' }
+    },
+    database: {
+      url: process.env.DATABASE_URL,
+      pool: { min: 5, max: 20 }
     }
   },
+  production: {
+    security: {
+      cors: { origin: ['https://app.craftify-email.com'] },
+      rateLimit: { max: 100 },
+      logging: { level: 'warn' }
+    },
+    database: {
+      url: process.env.DATABASE_URL,
+      pool: { min: 10, max: 50 }
+    }
+  }
 };
 ```
 
-## Security Configuration
+#### **2. Secrets Management**
+```typescript
+// AWS Secrets Manager integration
+import { SecretsManager } from 'aws-sdk';
 
-### Network Security
+const secretsManager = new SecretsManager({
+  region: process.env.AWS_REGION
+});
 
-#### Security Groups
-```hcl
-# infrastructure/modules/ecs/security-groups.tf
-resource "aws_security_group" "ecs" {
-  name_prefix = "${var.environment}-ecs-"
-  vpc_id      = var.vpc_id
-
-  ingress {
-    from_port       = 3001
-    to_port         = 3001
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "${var.environment}-ecs-security-group"
+async function getSecret(secretName: string): Promise<any> {
+  try {
+    const data = await secretsManager.getSecretValue({ SecretId: secretName }).promise();
+    return JSON.parse(data.SecretString || '{}');
+  } catch (error) {
+    logger.error('Failed to retrieve secret', error);
+    throw error;
   }
 }
+
+// Usage
+const databaseConfig = await getSecret('craftify/database-config');
+const apiKeys = await getSecret('craftify/api-keys');
 ```
 
-#### WAF Rules
-```yaml
-# infrastructure/waf-rules.yml
-Rules:
-  - Name: RateLimitRule
-    Priority: 1
-    Statement:
-      RateBasedStatement:
-        Limit: 2000
-        AggregateKeyType: IP
-    Action:
-      Block: {}
-    VisibilityConfig:
-      SampledRequestsEnabled: true
-      CloudWatchMetricsEnabled: true
-      MetricName: RateLimitRule
+### **Configuration Validation**
 
-  - Name: SQLInjectionRule
-    Priority: 2
-    Statement:
-      ManagedRuleGroupStatement:
-        VendorName: AWS
-        Name: AWSManagedRulesSQLiRuleSet
-    Action:
-      Allow: {}
-    VisibilityConfig:
-      SampledRequestsEnabled: true
-      CloudWatchMetricsEnabled: true
-      MetricName: SQLInjectionRule
-```
+#### **1. Environment Validation**
+```typescript
+// Environment validation at startup
+function validateEnvironment(): void {
+  const requiredEnvVars = [
+    'NODE_ENV',
+    'DATABASE_URL',
+    'REDIS_URL',
+    'JWT_SECRET',
+    'CORS_ORIGIN'
+  ];
 
-### Data Security
-
-#### Encryption at Rest
-```hcl
-# DynamoDB encryption
-resource "aws_dynamodb_table" "main" {
-  # ... other configuration
+  const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
   
-  server_side_encryption {
-    enabled = true
+  if (missingVars.length > 0) {
+    throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
   }
-  
-  point_in_time_recovery {
-    enabled = true
-  }
-}
-```
 
-#### Encryption in Transit
-```hcl
-# ALB HTTPS configuration
-resource "aws_lb_listener" "https" {
-  load_balancer_arn = aws_lb.main.arn
-  port              = "443"
-  protocol          = "HTTPS"
-  ssl_policy        = "ELBSecurityPolicy-TLS-1-2-2017-01"
-  certificate_arn   = var.certificate_arn
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.main.arn
+  // Validate environment-specific requirements
+  if (process.env.NODE_ENV === 'production') {
+    const productionVars = ['SSL_CERT_PATH', 'SSL_KEY_PATH', 'LOG_LEVEL'];
+    const missingProdVars = productionVars.filter(varName => !process.env[varName]);
+    
+    if (missingProdVars.length > 0) {
+      throw new Error(`Missing production environment variables: ${missingProdVars.join(', ')}`);
+    }
   }
 }
 ```
 
-## Backup and Recovery
+## 📈 **Performance Optimization**
 
-### Database Backups
+### **Performance Tuning**
 
-#### DynamoDB Point-in-Time Recovery
-```hcl
-resource "aws_dynamodb_table" "main" {
-  # ... other configuration
-  
-  point_in_time_recovery {
-    enabled = true
+#### **1. Database Optimization**
+```typescript
+// Database connection pooling
+const databaseConfig = {
+  pool: {
+    min: process.env.NODE_ENV === 'production' ? 10 : 2,
+    max: process.env.NODE_ENV === 'production' ? 50 : 10,
+    acquireTimeoutMillis: 60000,
+    createTimeoutMillis: 30000,
+    destroyTimeoutMillis: 5000,
+    idleTimeoutMillis: 30000,
+    reapIntervalMillis: 1000,
+    createRetryIntervalMillis: 200
+  },
+  connection: {
+    timeout: 20000,
+    query_timeout: 30000
   }
-}
+};
 ```
 
-#### Automated Backup Strategy
-```yaml
-# Backup configuration
-BackupConfiguration:
-  BackupRetentionPeriod: 7
-  BackupWindow: "03:00-04:00"
-  MaintenanceWindow: "sun:04:00-sun:05:00"
-```
-
-### Disaster Recovery
-
-#### Multi-Region Setup
-```hcl
-# Multi-region configuration
-provider "aws" {
-  alias  = "us-west-2"
-  region = "us-west-2"
-}
-
-module "dynamodb_west" {
-  source = "./modules/dynamodb"
-  
-  providers = {
-    aws = aws.us-west-2
+#### **2. Caching Strategy**
+```typescript
+// Redis caching configuration
+const cacheConfig = {
+  redis: {
+    host: process.env.REDIS_HOST,
+    port: parseInt(process.env.REDIS_PORT || '6379'),
+    password: process.env.REDIS_PASSWORD,
+    db: parseInt(process.env.REDIS_DB || '0'),
+    retryDelayOnFailover: 100,
+    enableReadyCheck: false,
+    maxRetriesPerRequest: 3
+  },
+  ttl: {
+    templates: 3600,        // 1 hour
+    userPermissions: 1800,  // 30 minutes
+    rateLimit: 900,         // 15 minutes
+    session: 86400          // 24 hours
   }
-  
-  environment = var.environment
-  tables     = var.dynamodb_tables
-}
+};
 ```
 
-#### Recovery Procedures
-```markdown
-# Disaster Recovery Runbook
+#### **3. Response Optimization**
+```typescript
+// Response compression
+app.use(compression({
+  level: 6,
+  threshold: 1024,
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  }
+}));
 
-## Database Recovery
-1. Identify the point of failure
-2. Restore from the latest backup
-3. Apply any pending transactions
-4. Verify data integrity
-5. Update DNS and routing
-
-## Application Recovery
-1. Deploy to backup region
-2. Update configuration
-3. Verify connectivity
-4. Test critical functionality
-5. Switch traffic to backup region
-```
-
-## Performance Optimization
-
-### Frontend Optimization
-
-#### Bundle Analysis
-```bash
-# Analyze bundle size
-npm run build:analyze
-
-# Bundle analyzer configuration
-import { defineConfig } from 'vite';
-import { visualizer } from 'rollup-plugin-visualizer';
-
-export default defineConfig({
-  plugins: [
-    visualizer({
-      filename: 'dist/stats.html',
-      open: true,
-      gzipSize: true,
-      brotliSize: true,
-    }),
-  ],
+// Response caching
+app.use((req, res, next) => {
+  if (req.method === 'GET') {
+    res.set('Cache-Control', 'public, max-age=300'); // 5 minutes
+  }
+  next();
 });
 ```
 
-#### CDN Configuration
-```hcl
-# CloudFront optimization
-resource "aws_cloudfront_distribution" "main" {
-  # ... other configuration
+### **Performance Monitoring**
+
+#### **1. Performance Metrics**
+```typescript
+// Performance monitoring middleware
+export const performanceMonitor = (req: Request, res: Response, next: NextFunction) => {
+  const startTime = process.hrtime();
   
-  default_cache_behavior {
-    target_origin_id       = aws_s3_bucket.main.id
-    viewer_protocol_policy = "redirect-to-https"
+  res.on('finish', () => {
+    const [seconds, nanoseconds] = process.hrtime(startTime);
+    const responseTime = seconds * 1000 + nanoseconds / 1000000;
     
-    forwarded_values {
-      query_string = false
-      cookies {
-        forward = "none"
-      }
+    // Log performance metrics
+    logger.info('Request performance', {
+      method: req.method,
+      endpoint: req.path,
+      responseTime: Math.round(responseTime),
+      statusCode: res.statusCode,
+      contentLength: res.get('Content-Length'),
+      userAgent: req.get('User-Agent')
+    });
+    
+    // Alert on slow requests
+    if (responseTime > 1000) {
+      logger.warn('Slow request detected', {
+        requestId: req.requestId,
+        responseTime: Math.round(responseTime),
+        threshold: 1000
+      });
     }
-    
-    min_ttl     = 0
-    default_ttl = 86400
-    max_ttl     = 31536000
-  }
+  });
   
-  price_class = "PriceClass_100"
-}
+  next();
+};
 ```
 
-### Backend Optimization
+---
 
-#### Auto Scaling
-```hcl
-resource "aws_appautoscaling_target" "ecs" {
-  max_capacity       = 10
-  min_capacity       = 2
-  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.main.name}"
-  scalable_dimension = "ecs:service:DesiredCount"
-  service_namespace  = "ecs"
-}
-
-resource "aws_appautoscaling_policy" "cpu" {
-  name               = "cpu-autoscaling"
-  policy_type        = "TargetTrackingScaling"
-  resource_id        = aws_appautoscaling_target.ecs.resource_id
-  scalable_dimension = aws_appautoscaling_target.ecs.scalable_dimension
-  service_namespace  = aws_appautoscaling_target.ecs.service_namespace
-
-  target_tracking_scaling_policy_configuration {
-    predefined_metric_specification {
-      predefined_metric_type = "ECSServiceAverageCPUUtilization"
-    }
-    target_value = 70.0
-  }
-}
-```
-
-## Deployment Checklist
-
-### Pre-Deployment
-- [ ] All tests passing
-- [ ] Code review completed
-- [ ] Security scan passed
-- [ ] Performance benchmarks met
-- [ ] Documentation updated
-- [ ] Environment variables configured
-- [ ] Secrets updated in AWS
-
-### Deployment
-- [ ] Infrastructure updated
-- [ ] Containers built and pushed
-- [ ] ECS service updated
-- [ ] Health checks passing
-- [ ] Load balancer configured
-- [ ] DNS updated
-- [ ] SSL certificates valid
-
-### Post-Deployment
-- [ ] Application accessible
-- [ ] Core functionality working
-- [ ] Performance metrics normal
-- [ ] Error rates acceptable
-- [ ] Monitoring alerts configured
-- [ ] Backup procedures tested
-- [ ] Rollback plan ready
-
-## Troubleshooting
-
-### Common Deployment Issues
-
-#### Container Health Checks
-```bash
-# Check container logs
-aws logs describe-log-groups --log-group-name-prefix "/ecs/craftify-email"
-
-# Check ECS service status
-aws ecs describe-services --cluster craftify-email --services craftify-email-service
-
-# Check target group health
-aws elbv2 describe-target-health --target-group-arn your-target-group-arn
-```
-
-#### Performance Issues
-```bash
-# Check CloudWatch metrics
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/ECS \
-  --metric-name CPUUtilization \
-  --dimensions Name=ServiceName,Value=craftify-email \
-  --start-time 2024-01-15T00:00:00Z \
-  --end-time 2024-01-15T23:59:59Z \
-  --period 300 \
-  --statistics Average
-```
-
-### Rollback Procedures
-
-#### Quick Rollback
-```bash
-# Rollback to previous task definition
-aws ecs update-service \
-  --cluster craftify-email \
-  --service craftify-email-service \
-  --task-definition craftify-email:previous-revision
-```
-
-#### Database Rollback
-```bash
-# Restore from point-in-time
-aws dynamodb restore-table-from-backup \
-  --target-table-name craftify-email-restored \
-  --backup-arn your-backup-arn
-```
-
-## Cost Optimization
-
-### Resource Optimization
-
-#### Right-sizing
-- Monitor CPU and memory utilization
-- Adjust ECS task CPU/memory allocation
-- Use Spot instances for non-critical workloads
-- Implement auto-scaling based on demand
-
-#### Storage Optimization
-- Use S3 lifecycle policies for old data
-- Implement data archiving strategies
-- Monitor DynamoDB read/write capacity
-- Use CloudFront for static asset delivery
-
-### Monitoring and Alerts
-
-#### Cost Alerts
-```yaml
-# CloudWatch cost anomaly detection
-Resources:
-  CostAnomalyDetector:
-    Type: AWS::CE::AnomalyDetector
-    Properties:
-      Monitor:
-        DimensionalValueCount: 10
-      AnomalySubscription:
-        Frequency: DAILY
-        Subscribers:
-          - Address: your-email@example.com
-            Type: EMAIL
-```
-
-## Future Considerations
-
-### Scalability Improvements
-- Implement microservices architecture
-- Use event-driven patterns
-- Add read replicas for database
-- Implement caching layers
-
-### Technology Evolution
-- Container orchestration with Kubernetes
-- Serverless functions for specific workloads
-- Edge computing for global performance
-- AI/ML integration for analytics
-
-### Compliance and Governance
-- SOC 2 compliance
-- GDPR compliance
-- Data residency requirements
-- Audit trail enhancements 
+**Deployment Status**: 🟢 **Production Ready** - Security and logging complete, deployment configurations ready  
+**Last Updated**: January 15, 2024  
+**Next Review**: January 22, 2024 

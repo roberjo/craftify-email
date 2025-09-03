@@ -1,164 +1,744 @@
-# Development Guide
+# 🛠️ Development Guide
 
-## Overview
+## 📋 **Table of Contents**
 
-This guide provides comprehensive instructions for setting up and developing the Craftify Email project. The project is structured as a monorepo using NPM workspaces, with separate applications for the frontend web app and backend API.
+- [🚀 Getting Started](#-getting-started)
+- [🏗️ Project Setup](#️-project-setup)
+- [🔒 Security Development](#-security-development)
+- [📊 Logging & Monitoring](#-logging--monitoring)
+- [🧪 Testing](#-testing)
+- [📝 Code Quality](#-code-quality)
+- [🚀 Deployment](#-deployment)
+- [🔧 Development Tools](#️-development-tools)
 
-## 🚀 **Quick Start**
+## 🚀 **Getting Started**
 
 ### **Prerequisites**
-- **Node.js**: Version 18.0.0 or higher
-- **npm**: Version 9.0.0 or higher
+- **Node.js**: Version 18 or higher
+- **npm**: Version 8 or higher (supports workspaces)
 - **Git**: For version control
+- **Docker**: For containerized development (optional)
 
-### **One-Command Setup**
+### **Quick Start**
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/your-org/craftify-email.git
 cd craftify-email
 
-# Run the automated setup script
-chmod +x scripts/dev-setup.sh
-./scripts/dev-setup.sh
-```
-
-This script will:
-- Install all dependencies across all workspaces
-- Build shared packages
-- Create necessary environment files
-- Set up the development environment
-
-## 🏗️ **Project Structure**
-
-```
-craftify-email/
-├── apps/                    # Application packages
-│   ├── web/                # Frontend React application
-│   └── api/                # Backend API application
-├── packages/                # Shared packages
-│   └── shared/             # Common types and utilities
-├── docs/                    # Project documentation
-├── scripts/                 # Development scripts
-└── tools/                   # Development tools
-```
-
-## 🔧 **Development Environment Setup**
-
-### **Manual Setup (Alternative to Script)**
-
-#### **1. Install Root Dependencies**
-```bash
-# Install root-level dependencies
+# Install dependencies
 npm install
 
-# Install dependencies for all workspaces
-npm run install:all
+# Start development environment
+npm run dev
+
+# Build all packages
+npm run build
+
+# Run tests
+npm test
 ```
 
-#### **2. Build Shared Packages**
-```bash
-# Build the shared package first
-npm run build --workspace=packages/shared
+## 🏗️ **Project Setup**
+
+### **Monorepo Structure**
+```
+craftify-email/
+├── 📁 apps/                          # Application packages
+│   ├── 📁 api/                       # Backend API server
+│   └── 📁 web/                       # Frontend React application
+├── 📁 packages/                      # Shared packages
+│   └── 📁 shared/                    # Common utilities and types
+├── 📁 docs/                          # Project documentation
+├── 📁 scripts/                       # Build and deployment scripts
+└── 📄 package.json                   # Root workspace configuration
 ```
 
-#### **3. Build Applications**
+### **Development Commands**
 ```bash
-# Build the web application
+# Start API server
+npm run dev:api
+
+# Start web application
+npm run dev:web
+
+# Start both (concurrent)
+npm run dev
+
+# Build specific package
+npm run build --workspace=apps/api
 npm run build --workspace=apps/web
 
-# Build the API application
-npm run build --workspace=apps/api
+# Run linting
+npm run lint
+
+# Run type checking
+npm run type-check
 ```
+
+## 🔒 **Security Development**
+
+### **Security Middleware Implementation**
+
+The API implements comprehensive enterprise-grade security features that developers should understand:
+
+#### **1. Security Headers (Helmet.js)**
+```typescript
+// Security headers configuration
+const helmetConfig = {
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "https://fonts.googleapis.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "wss:"],
+      frameSrc: ["'none'"],           // Prevent clickjacking
+      objectSrc: ["'none'"]           // Block dangerous objects
+    }
+  },
+  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  frameguard: { action: 'deny' },     // Prevent clickjacking
+  noSniff: true,                      // Prevent MIME type sniffing
+  xssFilter: true                     // Enable XSS filtering
+};
+```
+
+#### **2. Rate Limiting Configuration**
+```typescript
+// Multi-tier rate limiting
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100,                   // 100 requests per IP
+  message: 'Rate limit exceeded',
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+// Authentication rate limiting
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,                     // 5 auth attempts per IP
+  message: 'Too many authentication attempts'
+});
+
+// API-specific rate limiting
+const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,  // 1 minute
+  max: 30,                    // 30 requests per IP
+  message: 'API rate limit exceeded'
+});
+
+// Slow down repeated requests
+const slowDown = slowDown({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  delayAfter: 50,             // Delay after 50 requests
+  delayMs: 500                // 500ms delay per request
+});
+```
+
+#### **3. Input Validation & Sanitization**
+```typescript
+// Input validation middleware with Zod schemas
+export function validateRequest(schema: ZodSchema, location: 'body' | 'query' | 'params' = 'body') {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const dataToValidate = req[location];
+      const validatedData = await schema.parseAsync(dataToValidate);
+      req[location] = validatedData;
+      next();
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Request validation failed',
+            details: error.errors.map(err => `${err.path.join('.')}: ${err.input}`)
+          }
+        });
+      }
+      next(error);
+    }
+  };
+}
+
+// Request sanitization middleware
+export const sanitizeRequest = (req: Request, res: Response, next: NextFunction) => {
+  // Sanitize request body
+  if (req.body) {
+    req.body = sanitize(req.body);
+  }
+  
+  // Sanitize query parameters
+  if (req.query) {
+    req.query = sanitize(req.query);
+  }
+  
+  // Sanitize URL parameters
+  if (req.params) {
+    req.params = sanitize(req.params);
+  }
+  
+  next();
+};
+```
+
+### **Security Best Practices**
+
+#### **1. Input Validation**
+- Always validate and sanitize user input
+- Use Zod schemas for type-safe validation
+- Implement request size limits
+- Validate content types and file uploads
+
+#### **2. Authentication & Authorization**
+- Use JWT tokens with short expiration
+- Implement refresh token rotation
+- Validate user permissions on every request
+- Log authentication events for security monitoring
+
+#### **3. Data Sanitization**
+- Encode output to prevent XSS attacks
+- Use parameterized queries to prevent SQL injection
+- Sanitize file uploads and user content
+- Implement content security policies
+
+## 📊 **Logging & Monitoring**
+
+### **Structured Logging Implementation**
+
+#### **1. Logger Configuration**
+```typescript
+// Winston logger setup with structured logging
+class Logger {
+  private logger: winston.Logger;
+  
+  constructor() {
+    const transports: winston.transport[] = [];
+    
+    // Console transport for development
+    if (process.env.NODE_ENV === 'development') {
+      transports.push(new winston.transports.Console({
+        format: winston.format.combine(
+          winston.format.colorize(),
+          winston.format.simple()
+        )
+      }));
+    }
+    
+    // File transport for production
+    if (process.env.NODE_ENV === 'production') {
+      transports.push(new DailyRotateFile({
+        filename: 'logs/application-%DATE%.log',
+        datePattern: 'YYYY-MM-DD',
+        maxSize: '20m',
+        maxFiles: 30
+      }));
+      
+      // Error-specific log file
+      transports.push(new DailyRotateFile({
+        filename: 'logs/error-%DATE%.log',
+        datePattern: 'YYYY-MM-DD',
+        maxSize: '20m',
+        maxFiles: 90,
+        level: 'error'
+      }));
+      
+      // Security event log file
+      transports.push(new DailyRotateFile({
+        filename: 'logs/security-%DATE%.log',
+        datePattern: 'YYYY-MM-DD',
+        maxSize: '20m',
+        maxFiles: 365,
+        level: 'warn'
+      }));
+    }
+    
+    this.logger = winston.createLogger({
+      level: this.getLogLevel(),
+      format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.errors({ stack: true }),
+        winston.format.json()
+      ),
+      transports
+    });
+  }
+}
+```
+
+#### **2. Request Correlation**
+```typescript
+// Request correlation middleware
+export const requestLogger = (req: Request, res: Response, next: NextFunction) => {
+  // Generate or use existing request ID
+  const requestId = req.get('X-Request-ID') || generateRequestId();
+  req.requestId = requestId;
+  
+  // Add request ID to response headers
+  res.setHeader('X-Request-ID', requestId);
+  
+  // Log request start
+  logger.debug('Request started', {
+    requestId,
+    method: req.method,
+    endpoint: req.path,
+    userAgent: req.get('User-Agent'),
+    ipAddress: req.ip
+  });
+  
+  next();
+};
+```
+
+#### **3. Security Event Logging**
+```typescript
+// Security event logging
+export const logSecurityEvent = (event: string, details: any) => {
+  logger.warn(`Security Event: ${event}`, {
+    eventType: 'security',
+    severity: 'high',
+    timestamp: new Date().toISOString(),
+    details,
+    requestId: req.requestId,
+    ipAddress: req.ip,
+    userAgent: req.get('User-Agent')
+  });
+};
+
+// Usage examples
+logSecurityEvent('IP address blocked', { ip: clientIP, reason: 'blacklisted' });
+logSecurityEvent('Rate limit exceeded', { ip: clientIP, limit: '100 requests' });
+logSecurityEvent('Suspicious pattern detected', { pattern: 'XSS attempt' });
+```
+
+### **Logging Best Practices**
+
+#### **1. Log Levels**
+- **ERROR**: Application errors that need immediate attention
+- **WARN**: Warning conditions that should be monitored
+- **INFO**: General application flow information
+- **DEBUG**: Detailed debugging information (development only)
+- **HTTP**: HTTP request/response logging
+
+#### **2. Sensitive Data Handling**
+```typescript
+// Sanitize sensitive data before logging
+const sanitizeLogData = (data: any): any => {
+  const sensitiveFields = ['password', 'token', 'secret', 'key', 'authorization'];
+  const sanitized = { ...data };
+  
+  sensitiveFields.forEach(field => {
+    if (sanitized[field]) {
+      sanitized[field] = '[REDACTED]';
+    }
+  });
+  
+  return sanitized;
+};
+```
+
+#### **3. Performance Monitoring**
+```typescript
+// Performance monitoring middleware
+export const performanceLogger = (threshold: number = 1000) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const startTime = Date.now();
+    
+    res.on('finish', () => {
+      const responseTime = Date.now() - startTime;
+      
+      // Log slow requests
+      if (responseTime > threshold) {
+        logger.warn('Slow request detected', {
+          requestId: req.requestId,
+          method: req.method,
+          endpoint: req.path,
+          responseTime,
+          threshold
+        });
+      }
+      
+      // Log performance metrics
+      logger.info('Request performance', {
+        method: req.method,
+        endpoint: req.path,
+        responseTime,
+        statusCode: res.statusCode
+      });
+    });
+    
+    next();
+  };
+};
+```
+
+## 🧪 **Testing**
+
+### **Testing Strategy**
+
+#### **1. Unit Testing**
+```typescript
+// Jest configuration for API testing
+describe('Security Middleware', () => {
+  test('should prevent XSS attacks', async () => {
+    const maliciousPayload = '<script>alert("xss")</script>';
+    const response = await request(app)
+      .post('/api/templates')
+      .send({ content: maliciousPayload });
+    
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+  
+  test('should enforce rate limiting', async () => {
+    const requests = Array(101).fill().map(() => 
+      request(app).get('/api/templates')
+    );
+    
+    const responses = await Promise.all(requests);
+    const blockedRequests = responses.filter(r => r.status === 429);
+    
+    expect(blockedRequests.length).toBeGreaterThan(0);
+  });
+});
+```
+
+#### **2. Integration Testing**
+```typescript
+// API endpoint testing
+describe('Template API', () => {
+  test('should create template with valid data', async () => {
+    const templateData = {
+      name: 'Test Template',
+      description: 'Test description',
+      content: '<h1>Test</h1>',
+      category: 'test'
+    };
+    
+    const response = await request(app)
+      .post('/api/templates')
+      .set('Authorization', `Bearer ${validToken}`)
+      .send(templateData);
+    
+    expect(response.status).toBe(201);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.name).toBe(templateData.name);
+  });
+});
+```
+
+#### **3. Security Testing**
+```typescript
+// Security vulnerability testing
+describe('Security Tests', () => {
+  test('should block SQL injection attempts', async () => {
+    const sqlInjectionPayload = "'; DROP TABLE users; --";
+    const response = await request(app)
+      .post('/api/users')
+      .send({ query: sqlInjectionPayload });
+    
+    expect(response.status).toBe(400);
+  });
+  
+  test('should prevent CSRF attacks', async () => {
+    const response = await request(app)
+      .post('/api/templates')
+      .send(templateData);
+      // No CSRF token
+    
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe('CSRF_TOKEN_MISSING');
+  });
+});
+```
+
+### **Testing Best Practices**
+
+#### **1. Test Organization**
+- Group tests by functionality
+- Use descriptive test names
+- Test both success and failure scenarios
+- Mock external dependencies
+
+#### **2. Security Testing**
+- Test all security middleware
+- Validate input sanitization
+- Test rate limiting and blocking
+- Verify authentication and authorization
+
+#### **3. Performance Testing**
+- Test response times under load
+- Validate rate limiting effectiveness
+- Test memory usage and leaks
+- Monitor resource utilization
+
+## 📝 **Code Quality**
+
+### **ESLint Configuration**
+
+```json
+{
+  "extends": [
+    "@typescript-eslint/recommended",
+    "@typescript-eslint/recommended-requiring-type-checking"
+  ],
+  "rules": {
+    "@typescript-eslint/no-unused-vars": "error",
+    "@typescript-eslint/explicit-function-return-type": "warn",
+    "@typescript-eslint/no-explicit-any": "warn",
+    "security/detect-object-injection": "error",
+    "security/detect-non-literal-regexp": "error"
+  }
+}
+```
+
+### **Prettier Configuration**
+
+```json
+{
+  "semi": true,
+  "trailingComma": "es5",
+  "singleQuote": true,
+  "printWidth": 80,
+  "tabWidth": 2,
+  "useTabs": false
+}
+```
+
+### **TypeScript Configuration**
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx"
+  }
+}
+```
+
+### **Code Quality Standards**
+
+#### **1. Type Safety**
+- Use strict TypeScript configuration
+- Define interfaces for all data structures
+- Avoid `any` type usage
+- Use union types and generics appropriately
+
+#### **2. Error Handling**
+- Implement proper error boundaries
+- Use custom error classes
+- Log errors with context
+- Provide user-friendly error messages
+
+#### **3. Security Considerations**
+- Validate all inputs
+- Sanitize user content
+- Implement proper authentication
+- Use secure communication protocols
+
+## 🚀 **Deployment**
 
 ### **Environment Configuration**
 
-#### **Frontend Environment**
-Create `apps/web/.env.local`:
-```env
-VITE_API_BASE_URL=http://localhost:3001
-VITE_WS_URL=ws://localhost:3001
-VITE_APP_NAME=Craftify Email
-```
-
-#### **Backend Environment**
-Create `apps/api/.env.local`:
-```env
-PORT=3001
-NODE_ENV=development
-CORS_ORIGIN=http://localhost:8080
-JWT_SECRET=your-secret-key
-AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=your-access-key
-AWS_SECRET_ACCESS_KEY=your-secret-key
-```
-
-## 🖥️ **Running the Applications**
-
-### **Start Frontend Development Server**
+#### **1. Environment Variables**
 ```bash
-# From root directory
-npm run dev --workspace=apps/web
+# Security Configuration
+NODE_ENV=production
+CORS_ORIGIN=https://app.craftify-email.com
+ENABLE_GEO_BLOCKING=true
+ALLOWED_COUNTRIES=US,CA,GB,DE,FR
 
-# Or from apps/web directory
-cd apps/web
-npm run dev
+# Rate Limiting
+RATE_LIMIT_MAX=100
+RATE_LIMIT_WINDOW_MS=900000
+AUTH_RATE_LIMIT_MAX=5
+
+# Logging
+LOG_LEVEL=warn
+ENABLE_STRUCTURED_LOGGING=true
+CLOUDWATCH_LOG_GROUP=craftify-api-logs
+
+# Database
+DATABASE_URL=your_database_url
+REDIS_URL=your_redis_url
 ```
 
-**Frontend will be available at**: http://localhost:8080
+#### **2. Docker Configuration**
+```dockerfile
+# Multi-stage build for API
+FROM node:18-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
 
-### **Start Backend API Server**
-```bash
-# From root directory
-npm run dev --workspace=apps/api
+FROM node:18-alpine AS runtime
+WORKDIR /app
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+COPY package*.json ./
 
-# Or from apps/api directory
-cd apps/api
-npm run dev
+EXPOSE 3001
+CMD ["node", "dist/index.js"]
 ```
 
-**API will be available at**: http://localhost:3001
+### **Deployment Checklist**
 
-### **Start Both Simultaneously**
-```bash
-# From root directory
-npm run dev
-```
+#### **1. Pre-deployment**
+- [ ] All tests passing
+- [ ] Security scan completed
+- [ ] Performance benchmarks met
+- [ ] Documentation updated
+- [ ] Environment variables configured
 
-This will start both frontend and backend in parallel.
+#### **2. Deployment**
+- [ ] Database migrations applied
+- [ ] SSL certificates configured
+- [ ] Load balancer configured
+- [ ] Monitoring enabled
+- [ ] Backup systems verified
 
-## 📚 **API Development with Swagger**
+#### **3. Post-deployment**
+- [ ] Health checks passing
+- [ ] Performance metrics normal
+- [ ] Error rates acceptable
+- [ ] Security monitoring active
+- [ ] User acceptance testing completed
 
-### **Swagger Documentation**
-The API includes comprehensive Swagger/OpenAPI documentation:
+---
 
-- **Swagger UI**: http://localhost:3001/api-docs
-- **OpenAPI JSON**: http://localhost:3001/api-docs/swagger.json
+## 📚 **API Documentation (Swagger)**
 
-### **Adding New API Endpoints**
+### **Swagger Integration**
 
-#### **1. Create Route Handler**
+The API includes comprehensive Swagger/OpenAPI documentation for all endpoints, making it easy for developers to understand and test the API.
+
+#### **1. Swagger UI Access**
+- **Development**: `http://localhost:3001/api-docs`
+- **Production**: `https://api.craftify-email.com/api-docs`
+- **API Specification**: `https://api.craftify-email.com/api-docs.json`
+
+#### **2. Swagger Configuration**
 ```typescript
-// apps/api/src/routes/templates.ts
-import { Router } from 'express';
+// Swagger configuration
+const swaggerOptions = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'Craftify Email API',
+      version: '1.0.0',
+      description: 'Enterprise-grade email template management API',
+      contact: {
+        name: 'API Support',
+        email: 'api-support@craftify-email.com'
+      }
+    },
+    servers: [
+      {
+        url: 'http://localhost:3001',
+        description: 'Development server'
+      },
+      {
+        url: 'https://api.craftify-email.com',
+        description: 'Production server'
+      }
+    ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT'
+        },
+        apiKey: {
+          type: 'apiKey',
+          in: 'header',
+          name: 'X-API-Key'
+        }
+      }
+    },
+    security: [
+      {
+        bearerAuth: [],
+        apiKey: []
+      }
+    ]
+  },
+  apis: ['./src/routes/*.ts', './src/models/*.ts']
+};
+```
 
-const router = Router();
+#### **3. API Endpoint Documentation**
 
+##### **Health & Status Endpoints**
+```typescript
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     summary: Health check endpoint
+ *     description: Returns the current health status of the API
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: API is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: "ok"
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ *                 uptime:
+ *                   type: number
+ *                   description: Server uptime in seconds
+ *                 version:
+ *                   type: string
+ *                   example: "1.0.0"
+ */
+```
+
+##### **Template Management Endpoints**
+```typescript
 /**
  * @swagger
  * /api/templates:
  *   get:
  *     summary: Get all templates
- *     description: Retrieve a list of email templates
+ *     description: Retrieve a paginated list of email templates
  *     tags: [Templates]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: domain
+ *         name: page
  *         schema:
- *           type: string
- *         required: true
- *         description: Domain identifier
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 20
+ *         description: Number of items per page
  *     responses:
  *       200:
  *         description: List of templates retrieved successfully
@@ -172,518 +752,194 @@ const router = Router();
  *                 data:
  *                   type: array
  *                   items:
- *                     $ref: '#/components/schemas/EmailTemplate'
+ *                     $ref: '#/components/schemas/Template'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/Pagination'
  *       401:
- *         description: Unauthorized
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ *         description: Unauthorized - Invalid or missing authentication
+ *       403:
+ *         description: Forbidden - Insufficient permissions
  */
-router.get('/', async (req, res) => {
-  try {
-    // Implementation here
-    res.json({
-      success: true,
-      data: [],
-      meta: {
-        timestamp: new Date().toISOString(),
-        requestId: generateRequestId()
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: {
-        code: 'INTERNAL_ERROR',
-        message: 'Failed to retrieve templates',
-        details: error.message
-      }
-    });
-  }
-});
-
-export default router;
 ```
 
-#### **2. Register Route in Main Router**
+#### **4. Schema Definitions**
 ```typescript
-// apps/api/src/routes/index.ts
-import templateRoutes from './templates';
-
-// ... existing code ...
-
-router.use('/templates', templateRoutes);
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Template:
+ *       type: object
+ *       required:
+ *         - name
+ *         - content
+ *         - category
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *           description: Unique template identifier
+ *         name:
+ *           type: string
+ *           minLength: 1
+ *           maxLength: 100
+ *           description: Template name
+ *         description:
+ *           type: string
+ *           maxLength: 500
+ *           description: Template description
+ *         content:
+ *           type: string
+ *           description: HTML content of the template
+ *         category:
+ *           type: string
+ *           enum: [marketing, transactional, notification, newsletter]
+ *           description: Template category
+ *         status:
+ *           type: string
+ *           enum: [draft, active, archived]
+ *           default: draft
+ *         createdBy:
+ *           type: string
+ *           format: uuid
+ *           description: User ID who created the template
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *     Pagination:
+ *       type: object
+ *       properties:
+ *         page:
+ *           type: integer
+ *           description: Current page number
+ *         limit:
+ *           type: integer
+ *           description: Items per page
+ *         total:
+ *           type: integer
+ *           description: Total number of items
+ *         pages:
+ *           type: integer
+ *           description: Total number of pages
+ */
 ```
 
-#### **3. Add Schema Definitions**
-```typescript
-// apps/api/src/config/swagger.ts
-// Add to the components.schemas section:
+#### **5. Testing with Swagger UI**
 
-EmailTemplate: {
-  type: 'object',
-  properties: {
-    id: {
-      type: 'string',
-      example: 'template_123'
-    },
-    name: {
-      type: 'string',
-      example: 'Welcome Email'
-    },
-    // ... other properties
-  }
-}
-```
+##### **Authentication Setup**
+1. **JWT Token**: Use the `/auth/login` endpoint to get a JWT token
+2. **API Key**: Add your API key in the `X-API-Key` header
+3. **Authorization**: Click the "Authorize" button in Swagger UI
 
-### **Testing API Endpoints**
+##### **Testing Workflow**
+1. **Explore Endpoints**: Browse available endpoints by category
+2. **Try It Out**: Click "Try it out" for any endpoint
+3. **Fill Parameters**: Provide required parameters and request body
+4. **Execute**: Click "Execute" to send the request
+5. **View Response**: See the response, status code, and headers
 
-#### **Using Swagger UI**
-1. Open http://localhost:3001/api-docs
-2. Click on any endpoint
-3. Click "Try it out"
-4. Fill in parameters and click "Execute"
-
-#### **Using cURL**
+##### **Example API Calls**
 ```bash
 # Health check
-curl http://localhost:3001/health
+curl -X GET "http://localhost:3001/health" \
+  -H "accept: application/json"
 
-# API info
-curl http://localhost:3001/api
+# Get templates (with authentication)
+curl -X GET "http://localhost:3001/api/templates?page=1&limit=10" \
+  -H "accept: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
 
-# Test with authentication (when implemented)
-curl -H "Authorization: Bearer YOUR_TOKEN" \
-     http://localhost:3001/api/templates?domain=marketing
+# Create template
+curl -X POST "http://localhost:3001/api/templates" \
+  -H "accept: application/json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "name": "Welcome Email",
+    "description": "Welcome email for new users",
+    "content": "<h1>Welcome!</h1><p>Thank you for joining us.</p>",
+    "category": "marketing"
+  }'
 ```
 
-#### **Using Postman**
-1. Import the OpenAPI specification from `/api-docs/swagger.json`
-2. Set up environment variables
-3. Test endpoints with the collection
+#### **6. Swagger Best Practices**
 
-## 🎨 **Frontend Development**
+##### **Documentation Standards**
+- **Clear Descriptions**: Provide meaningful descriptions for all endpoints
+- **Example Values**: Include realistic example values for parameters
+- **Response Examples**: Show expected response formats
+- **Error Codes**: Document all possible error responses
+- **Authentication**: Clearly specify authentication requirements
 
-### **Component Development**
+##### **Security Documentation**
+- **Bearer Tokens**: Document JWT authentication flow
+- **API Keys**: Explain API key usage and permissions
+- **Rate Limits**: Document rate limiting policies
+- **IP Restrictions**: Note any IP-based access controls
 
-#### **Creating New Components**
-```typescript
-// apps/web/src/components/ui/MyComponent.tsx
-import React from 'react';
-import { cn } from '@/lib/utils';
+##### **Maintenance**
+- **Version Updates**: Keep API version information current
+- **Endpoint Changes**: Update documentation when endpoints change
+- **Schema Evolution**: Maintain backward compatibility in schemas
+- **Regular Reviews**: Schedule periodic documentation reviews
 
-interface MyComponentProps {
-  className?: string;
-  children?: React.ReactNode;
-}
+---
 
-export const MyComponent: React.FC<MyComponentProps> = ({
-  className,
-  children
-}) => {
-  return (
-    <div className={cn("base-styles", className)}>
-      {children}
-    </div>
-  );
-};
-```
+## 🔧 **Development Tools**
 
-#### **Using Shadcn/ui Components**
+### **Recommended Tools**
+
+#### **1. Code Editors**
+- **VS Code**: Primary development environment
+- **Extensions**: TypeScript, ESLint, Prettier, GitLens
+
+#### **2. API Testing**
+- **Postman**: API endpoint testing
+- **Insomnia**: Alternative API client
+- **cURL**: Command-line API testing
+
+#### **3. Database Tools**
+- **DynamoDB Admin**: AWS DynamoDB management
+- **Redis Commander**: Redis database management
+- **MongoDB Compass**: MongoDB management (if applicable)
+
+#### **4. Monitoring Tools**
+- **AWS CloudWatch**: Log aggregation and metrics
+- **Grafana**: Dashboard and visualization
+- **Prometheus**: Metrics collection
+
+### **Development Workflow**
+
+#### **1. Feature Development**
 ```bash
-# Add new components from shadcn/ui
-cd apps/web
-npx shadcn@latest add [component-name]
+# Create feature branch
+git checkout -b feature/new-feature
+
+# Make changes and commit
+git add .
+git commit -m "feat: add new feature with security enhancements"
+
+# Push and create pull request
+git push origin feature/new-feature
 ```
 
-### **State Management**
-
-#### **Creating Zustand Store**
-```typescript
-// apps/web/src/store/useMyStore.ts
-import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
-
-interface MyState {
-  data: any[];
-  loading: boolean;
-  fetchData: () => Promise<void>;
-}
-
-export const useMyStore = create<MyState>()(
-  devtools(
-    (set, get) => ({
-      data: [],
-      loading: false,
-      fetchData: async () => {
-        set({ loading: true });
-        try {
-          // API call here
-          const response = await fetch('/api/data');
-          const data = await response.json();
-          set({ data: data.data, loading: false });
-        } catch (error) {
-          set({ loading: false });
-          console.error('Failed to fetch data:', error);
-        }
-      },
-    }),
-    { name: 'my-store' }
-  )
-);
-```
-
-### **API Integration**
-
-#### **Creating API Hooks**
-```typescript
-// apps/web/src/hooks/useApi.ts
-import { useState, useEffect } from 'react';
-
-interface UseApiOptions<T> {
-  url: string;
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
-  body?: any;
-  headers?: Record<string, string>;
-}
-
-export function useApi<T>({ url, method = 'GET', body, headers }: UseApiOptions<T>) {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const execute = async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...headers,
-        },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      setData(result.data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (method === 'GET') {
-      execute();
-    }
-  }, [url]);
-
-  return { data, loading, error, execute };
-}
-```
-
-## 🧪 **Testing**
-
-### **Running Tests**
-
-#### **Frontend Tests**
-```bash
-cd apps/web
-npm test                    # Run tests in watch mode
-npm run test:coverage      # Run tests with coverage
-npm run test:ci            # Run tests once for CI
-```
-
-#### **Backend Tests**
-```bash
-cd apps/api
-npm test                    # Run tests in watch mode
-npm run test:coverage      # Run tests with coverage
-npm run test:ci            # Run tests once for CI
-```
-
-### **Writing Tests**
-
-#### **Frontend Component Test**
-```typescript
-// apps/web/src/components/__tests__/MyComponent.test.tsx
-import { render, screen } from '@testing-library/react';
-import { MyComponent } from '../MyComponent';
-
-describe('MyComponent', () => {
-  it('renders correctly', () => {
-    render(<MyComponent>Test Content</MyComponent>);
-    expect(screen.getByText('Test Content')).toBeInTheDocument();
-  });
-});
-```
-
-#### **Backend API Test**
-```typescript
-// apps/api/src/routes/__tests__/templates.test.ts
-import request from 'supertest';
-import app from '../../index';
-
-describe('GET /api/templates', () => {
-  it('should return templates list', async () => {
-    const response = await request(app)
-      .get('/api/templates')
-      .expect(200);
-
-    expect(response.body.success).toBe(true);
-    expect(Array.isArray(response.body.data)).toBe(true);
-  });
-});
-```
-
-## 🔍 **Debugging**
-
-### **Frontend Debugging**
-
-#### **React Developer Tools**
-- Install React Developer Tools browser extension
-- Use Components tab to inspect component hierarchy
-- Use Profiler tab to analyze performance
-
-#### **Console Logging**
-```typescript
-// Use console.log for debugging
-console.log('Component rendered with props:', props);
-
-// Use console.group for grouped logs
-console.group('API Response');
-console.log('Status:', response.status);
-console.log('Data:', response.data);
-console.groupEnd();
-```
-
-### **Backend Debugging**
-
-#### **Node.js Debugger**
-```bash
-# Start with debugger
-cd apps/api
-node --inspect src/index.ts
-
-# Or use tsx with debugging
-npx tsx --inspect src/index.ts
-```
-
-#### **Logging**
-```typescript
-// Use the logger utility
-import { logger } from '../utils/logger';
-
-logger.info('Request received', { path: req.path, method: req.method });
-logger.error('Database connection failed', { error: err.message });
-logger.debug('Processing template', { templateId: req.params.id });
-```
-
-## 📦 **Building for Production**
-
-### **Build All Packages**
-```bash
-# From root directory
-npm run build:all
-
-# This will build:
-# - packages/shared
-# - apps/web
-# - apps/api
-```
-
-### **Build Individual Packages**
-```bash
-# Build shared package
-npm run build --workspace=packages/shared
-
-# Build web app
-npm run build --workspace=apps/web
-
-# Build API
-npm run build --workspace=apps/api
-```
-
-### **Production Builds**
-
-#### **Frontend Production Build**
-```bash
-cd apps/web
-npm run build
-```
-
-The built files will be in `apps/web/dist/` and ready for deployment.
-
-#### **Backend Production Build**
-```bash
-cd apps/api
-npm run build
-npm start
-```
-
-## 🚀 **Deployment**
-
-### **Frontend Deployment**
-```bash
-# Build the application
-cd apps/web
-npm run build
-
-# Deploy dist/ folder to your hosting service
-# Examples: Vercel, Netlify, AWS S3, etc.
-```
-
-### **Backend Deployment**
-```bash
-# Build the application
-cd apps/api
-npm run build
-
-# Start production server
-npm start
-
-# Or use PM2 for process management
-pm2 start dist/index.js --name "craftify-api"
-```
-
-## 🔧 **Development Scripts**
-
-### **Available Scripts**
-
-#### **Root Level Scripts**
-```bash
-npm run dev              # Start both frontend and backend
-npm run build:all        # Build all packages
-npm run install:all      # Install dependencies for all workspaces
-npm run clean:all        # Clean build artifacts from all workspaces
-npm run lint:all         # Lint all packages
-npm run test:all         # Run tests for all packages
-```
-
-#### **Frontend Scripts**
-```bash
-npm run dev --workspace=apps/web      # Start development server
-npm run build --workspace=apps/web    # Build for production
-npm run preview --workspace=apps/web  # Preview production build
-npm run lint --workspace=apps/web     # Lint code
-npm run test --workspace=apps/web     # Run tests
-```
-
-#### **Backend Scripts**
-```bash
-npm run dev --workspace=apps/api      # Start development server
-npm run build --workspace=apps/api    # Build for production
-npm run start --workspace=apps/api    # Start production server
-npm run lint --workspace=apps/api     # Lint code
-npm run test --workspace=apps/api     # Run tests
-```
-
-## 📚 **Useful Commands**
-
-### **Workspace Management**
-```bash
-# Run command in specific workspace
-npm run dev --workspace=apps/web
-npm run build --workspace=apps/api
-
-# Install package in specific workspace
-npm install lodash --workspace=apps/web
-npm install express --workspace=apps/api
-
-# Run command in all workspaces
-npm run lint --workspaces
-npm run test --workspaces
-```
-
-### **Dependency Management**
-```bash
-# Check for outdated packages
-npm outdated
-
-# Update packages
-npm update
-
-# Audit for security vulnerabilities
-npm audit
-npm audit fix
-```
-
-## 🐛 **Common Issues & Solutions**
-
-### **Build Issues**
-
-#### **TypeScript Compilation Errors**
-```bash
-# Clean and rebuild
-npm run clean:all
-npm run build:all
-```
-
-#### **Dependency Issues**
-```bash
-# Clear npm cache
-npm cache clean --force
-
-# Remove node_modules and reinstall
-rm -rf node_modules
-rm -rf apps/*/node_modules
-rm -rf packages/*/node_modules
-npm install
-```
-
-### **Runtime Issues**
-
-#### **Port Already in Use**
-```bash
-# Find process using port
-lsof -i :3001
-lsof -i :8080
-
-# Kill process
-kill -9 <PID>
-```
-
-#### **WebSocket Connection Issues**
-- Check if backend is running
-- Verify WebSocket server is initialized
-- Check browser console for connection errors
-
-## 📖 **Additional Resources**
-
-### **Documentation**
-- [Project README](../README.md) - Project overview and setup
-- [API Documentation](./api.md) - Complete API reference
-- [Architecture Guide](./architecture.md) - System architecture details
-- [Contributing Guide](./contributing.md) - How to contribute
-
-### **External Resources**
-- [React Documentation](https://react.dev/)
-- [TypeScript Handbook](https://www.typescriptlang.org/docs/)
-- [Express.js Guide](https://expressjs.com/)
-- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
-- [Shadcn/ui Components](https://ui.shadcn.com/)
-
-### **Development Tools**
-- [Vite Documentation](https://vitejs.dev/)
-- [Zustand Documentation](https://github.com/pmndrs/zustand)
-- [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/)
-- [Jest Documentation](https://jestjs.io/docs/getting-started)
-
-## 🎯 **Next Steps**
-
-1. **Complete API Implementation**: Finish template CRUD operations
-2. **Add Authentication**: Implement JWT-based authentication
-3. **Database Integration**: Connect to DynamoDB
-4. **Frontend-Backend Integration**: Connect React app to API
-5. **Testing**: Add comprehensive test coverage
-6. **Deployment**: Set up production deployment pipeline
-
-The development environment is now fully set up with hot reloading, comprehensive documentation, and a solid foundation for building features. You can start developing immediately with the working frontend and backend infrastructure. 
+#### **2. Code Review Process**
+- Security review for all changes
+- Performance impact assessment
+- Documentation updates required
+- Testing coverage verification
+
+#### **3. Deployment Process**
+- Automated testing in CI/CD
+- Security scanning and validation
+- Staging environment testing
+- Production deployment with rollback capability
+
+---
+
+**Development Status**: 🟢 **Active Development** - Security, logging, and Swagger documentation complete, core features in development  
+**Last Updated**: January 15, 2024  
+**Next Review**: January 22, 2024 
