@@ -1,0 +1,60 @@
+{
+    "name": "@craftify/api",
+    "version": "1.0.0",
+    "description": "Backend API for Craftify Email",
+    "main": "dist/index.js",
+    "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js",
+        "clean": "rm -rf dist",
+        "type-check": "tsc --noEmit",
+        "test": "jest",
+        "test:watch": "jest --watch",
+        "test:coverage": "jest --coverage",
+        "lint": "eslint src --ext .ts",
+        "lint:fix": "eslint src --ext .ts --fix"
+    },
+    "dependencies": {
+        "@craftify/shared": "workspace:*",
+        "express": "^4.18.2",
+        "cors": "^2.8.5",
+        "helmet": "^7.1.0",
+        "compression": "^1.7.4",
+        "morgan": "^1.10.0",
+        "dotenv": "^16.3.1",
+        "zod": "^3.25.76",
+        "jsonwebtoken": "^9.0.2",
+        "bcryptjs": "^2.4.3",
+        "aws-sdk": "^2.1531.0",
+        "redis": "^4.6.10",
+        "ws": "^8.14.2",
+        "multer": "^1.4.5-lts.1",
+        "nodemailer": "^6.9.7",
+        "rate-limiter-flexible": "^3.0.8",
+        "express-rate-limit": "^7.1.5"
+    },
+    "devDependencies": {
+        "@types/express": "^4.17.21",
+        "@types/cors": "^2.8.17",
+        "@types/compression": "^1.7.5",
+        "@types/morgan": "^1.9.9",
+        "@types/jsonwebtoken": "^9.0.5",
+        "@types/bcryptjs": "^2.4.6",
+        "@types/multer": "^1.4.11",
+        "@types/nodemailer": "^6.4.14",
+        "@types/ws": "^8.5.10",
+        "@types/node": "^22.16.5",
+        "typescript": "^5.8.3",
+        "tsx": "^4.7.0",
+        "jest": "^29.7.0",
+        "@types/jest": "^29.5.8",
+        "ts-jest": "^29.1.1",
+        "supertest": "^6.3.3",
+        "@types/supertest": "^2.0.16",
+        "nodemon": "^3.0.2"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
+}

@@ -1,2 +1,271 @@
-# Auto detect text files and perform LF normalization
+# Set default behavior to automatically normalize line endings
 * text=auto
+
+# Explicitly declare text files you want to always be normalized and converted
+# to native line endings on checkout
+*.ts text
+*.tsx text
+*.js text
+*.jsx text
+*.json text
+*.md text
+*.yml text
+*.yaml text
+*.css text
+*.scss text
+*.html text
+*.xml text
+*.svg text
+*.txt text
+*.sh text
+*.bat text
+*.cmd text
+*.ps1 text
+
+# Declare files that will always have CRLF line endings on checkout
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Declare files that will always have LF line endings on checkout
+*.sh text eol=lf
+
+# Denote all files that are truly binary and should not be modified
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mov binary
+*.mp4 binary
+*.mp3 binary
+*.flv binary
+*.fla binary
+*.swf binary
+*.gz binary
+*.zip binary
+*.7z binary
+*.ttf binary
+*.eot binary
+*.woff binary
+*.woff2 binary
+*.pyc binary
+*.pdf binary
+
+# Package files
+*.tgz binary
+*.tar.gz binary
+
+# Lock files
+package-lock.json text
+yarn.lock text
+pnpm-lock.yaml text
+bun.lockb binary
+
+# Documentation
+*.md text diff=markdown
+
+# Scripts
+*.sh text eol=lf
+*.js text
+*.ts text
+*.tsx text
+
+# Config files
+*.json text
+*.yml text
+*.yaml text
+*.toml text
+*.ini text
+*.cfg text
+*.conf text
+
+# Source code
+*.c text
+*.cpp text
+*.h text
+*.hpp text
+*.java text
+*.py text
+*.rb text
+*.go text
+*.rs text
+*.php text
+*.cs text
+*.vb text
+*.swift text
+*.kt text
+*.scala text
+
+# Web files
+*.html text
+*.css text
+*.scss text
+*.sass text
+*.less text
+*.xml text
+*.svg text
+*.js text
+*.jsx text
+*.ts text
+*.tsx text
+
+# Database
+*.sql text
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+
+# Logs (should be ignored, but if tracked)
+*.log text
+
+# Environment files (should be ignored, but if tracked)
+*.env text
+*.env.* text
+
+# Docker
+Dockerfile text
+docker-compose*.yml text
+.dockerignore text
+
+# Terraform
+*.tf text
+*.tfvars text
+*.tfstate binary
+*.tfstate.* binary
+
+# Kubernetes
+*.yaml text
+*.yml text
+
+# CI/CD
+.github/** text
+.gitlab-ci.yml text
+.travis.yml text
+.circleci/** text
+
+# IDE and Editor files (should be ignored, but if tracked)
+.vscode/** text
+.idea/** text
+*.sublime-project text
+*.sublime-workspace text
+
+# OS generated files (should be ignored, but if tracked)
+.DS_Store binary
+Thumbs.db binary
+ehthumbs.db binary
+Desktop.ini text
+
+# Archives
+*.zip binary
+*.tar binary
+*.gz binary
+*.bz2 binary
+*.7z binary
+*.rar binary
+
+# Certificates and keys
+*.pem text
+*.key text
+*.crt text
+*.csr text
+*.p12 binary
+*.pfx binary
+
+# Fonts
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.eot binary
+
+# Images
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.bmp binary
+*.tiff binary
+*.webp binary
+*.ico binary
+*.svg text
+
+# Audio/Video
+*.mp3 binary
+*.mp4 binary
+*.avi binary
+*.mov binary
+*.wmv binary
+*.flv binary
+*.wav binary
+*.ogg binary
+*.aac binary
+
+# Documents
+*.pdf binary
+*.doc binary
+*.docx binary
+*.xls binary
+*.xlsx binary
+*.ppt binary
+*.pptx binary
+*.odt text
+*.ods text
+*.odp text
+
+# Executables
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.app binary
+*.deb binary
+*.rpm binary
+*.msi binary
+*.pkg binary
+
+# Source control
+.git/** text
+.gitignore text
+.gitattributes text
+.gitmodules text
+
+# Dependencies (should be ignored, but if tracked)
+node_modules/** binary
+vendor/** binary
+
+# Build outputs (should be ignored, but if tracked)
+dist/** binary
+build/** binary
+out/** binary
+.next/** binary
+.nuxt/** binary
+dist/** binary
+
+# Coverage reports (should be ignored, but if tracked)
+coverage/** text
+*.lcov text
+
+# TypeScript
+*.tsbuildinfo binary
+
+# Cache files (should be ignored, but if tracked)
+.cache/** binary
+.parcel-cache/** binary
+.vite/** binary
+.eslintcache text
+.stylelintcache text
+
+# Temporary files (should be ignored, but if tracked)
+*.tmp text
+*.temp text
+*~ text
+
+# Backup files (should be ignored, but if tracked)
+*.bak text
+*.backup text
+*.old text
+
+# Local development
+.local/** text
+.localhost/** text

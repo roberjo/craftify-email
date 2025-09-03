@@ -1,0 +1,26 @@
+{
+    "name": "@craftify/shared",
+    "version": "1.0.0",
+    "description": "Shared types and utilities for Craftify Email",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsc --watch",
+        "clean": "rm -rf dist",
+        "type-check": "tsc --noEmit"
+    },
+    "dependencies": {
+        "zod": "^3.25.76"
+    },
+    "devDependencies": {
+        "typescript": "^5.8.3"
+    },
+    "peerDependencies": {},
+    "files": [
+        "dist"
+    ],
+    "publishConfig": {
+        "access": "restricted"
+    }
+}
