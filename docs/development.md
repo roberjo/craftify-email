@@ -1,997 +1,689 @@
 # Development Guide
 
-## Getting Started
+## Overview
 
-### Prerequisites
+This guide provides comprehensive instructions for setting up and developing the Craftify Email project. The project is structured as a monorepo using NPM workspaces, with separate applications for the frontend web app and backend API.
 
-Before you begin, ensure you have the following installed:
+## 🚀 **Quick Start**
 
-- **Node.js** 18.0.0 or higher
-- **npm** 9.0.0 or higher (or **yarn** 1.22.0+ / **pnpm** 8.0.0+)
-- **Git** 2.30.0 or higher
-- **VS Code** (recommended) with extensions:
-  - ESLint
-  - Prettier
-  - TypeScript and JavaScript Language Features
-  - Tailwind CSS IntelliSense
+### **Prerequisites**
+- **Node.js**: Version 18.0.0 or higher
+- **npm**: Version 9.0.0 or higher
+- **Git**: For version control
 
-### Environment Setup
+### **One-Command Setup**
+```bash
+# Clone the repository
+git clone <repository-url>
+cd craftify-email
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/your-org/craftify-email.git
-   cd craftify-email
-   ```
+# Run the automated setup script
+chmod +x scripts/dev-setup.sh
+./scripts/dev-setup.sh
+```
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   # or
-   yarn install
-   # or
-   pnpm install
-   ```
+This script will:
+- Install all dependencies across all workspaces
+- Build shared packages
+- Create necessary environment files
+- Set up the development environment
 
-3. **Set up environment variables**
-   ```bash
-   cp .env.example .env.local
-   ```
-   
-   Edit `.env.local` with your configuration:
-   ```env
-   VITE_API_BASE_URL=http://localhost:3001
-   VITE_APP_NAME=Craftify Email
-   VITE_APP_VERSION=1.0.0
-   ```
-
-4. **Start development server**
-   ```bash
-   npm run dev
-   ```
-
-5. **Open your browser**
-   Navigate to [http://localhost:5173](http://localhost:5173)
-
-## Project Structure
+## 🏗️ **Project Structure**
 
 ```
 craftify-email/
-├── apps/
-│   └── web/                    # React frontend application
-│       ├── src/
-│       │   ├── components/     # Reusable UI components
-│       │   ├── hooks/          # Custom React hooks
-│       │   ├── lib/            # Utility functions and configs
-│       │   ├── pages/          # Page components
-│       │   ├── store/          # State management (Zustand)
-│       │   ├── types/          # TypeScript type definitions
-│       │   └── main.tsx        # Application entry point
-│       ├── public/             # Static assets
-│       ├── index.html          # HTML template
-│       ├── package.json        # Frontend dependencies
-│       ├── vite.config.ts      # Vite configuration
-│       ├── tailwind.config.ts  # Tailwind CSS configuration
-│       └── tsconfig.json       # TypeScript configuration
-├── packages/                    # Shared packages (planned)
-├── docs/                       # Project documentation
-├── scripts/                    # Build and deployment scripts
-└── tools/                      # Development tools and configs
+├── apps/                    # Application packages
+│   ├── web/                # Frontend React application
+│   └── api/                # Backend API application
+├── packages/                # Shared packages
+│   └── shared/             # Common types and utilities
+├── docs/                    # Project documentation
+├── scripts/                 # Development scripts
+└── tools/                   # Development tools
 ```
 
-## Development Workflow
+## 🔧 **Development Environment Setup**
 
-### Code Style and Standards
+### **Manual Setup (Alternative to Script)**
 
-#### TypeScript
-- Use **strict mode** - all TypeScript strict flags are enabled
-- Prefer **interfaces** over types for object shapes
-- Use **generic types** for reusable components
-- Implement proper **error handling** with typed errors
+#### **1. Install Root Dependencies**
+```bash
+# Install root-level dependencies
+npm install
 
-```typescript
-// Good: Interface for object shapes
-interface EmailTemplate {
-  id: string;
-  name: string;
-  subject: string;
-  htmlContent: string;
-}
-
-// Good: Generic component
-interface ListProps<T> {
-  items: T[];
-  renderItem: (item: T) => React.ReactNode;
-}
-
-// Good: Typed error handling
-class TemplateError extends Error {
-  constructor(
-    message: string,
-    public code: 'NOT_FOUND' | 'VALIDATION_ERROR' | 'PERMISSION_DENIED'
-  ) {
-    super(message);
-    this.name = 'TemplateError';
-  }
-}
+# Install dependencies for all workspaces
+npm run install:all
 ```
 
-#### React Best Practices
-- Use **functional components** with hooks
-- Implement **proper dependency arrays** in useEffect
-- Use **React.memo** for expensive components
-- Follow **custom hook patterns** for reusable logic
-
-```typescript
-// Good: Custom hook with proper dependencies
-function useTemplate(templateId: string) {
-  const [template, setTemplate] = useState<EmailTemplate | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    
-    const fetchTemplate = async () => {
-      try {
-        setLoading(true);
-        const data = await api.getTemplate(templateId);
-        if (!cancelled) {
-          setTemplate(data);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err as Error);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchTemplate();
-    
-    return () => {
-      cancelled = true;
-    };
-  }, [templateId]);
-
-  return { template, loading, error };
-}
-
-// Good: Memoized component
-const TemplateCard = React.memo(({ template, onSelect }: TemplateCardProps) => {
-  // Component implementation
-});
+#### **2. Build Shared Packages**
+```bash
+# Build the shared package first
+npm run build --workspace=packages/shared
 ```
 
-#### CSS and Styling
-- Use **Tailwind CSS** utility classes
-- Follow **mobile-first** responsive design
-- Use **CSS custom properties** for theming
-- Implement **consistent spacing** with design tokens
+#### **3. Build Applications**
+```bash
+# Build the web application
+npm run build --workspace=apps/web
 
-```typescript
-// Good: Responsive design with Tailwind
-<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-  {/* Content */}
-</div>
-
-// Good: Custom CSS properties
-:root {
-  --spacing-xs: 0.25rem;
-  --spacing-sm: 0.5rem;
-  --spacing-md: 1rem;
-  --spacing-lg: 1.5rem;
-  --spacing-xl: 2rem;
-}
+# Build the API application
+npm run build --workspace=apps/api
 ```
 
-### State Management
+### **Environment Configuration**
 
-#### Zustand Store Patterns
-- Keep stores **focused and single-purpose**
-- Use **immer** for complex state updates
-- Implement **proper error handling**
-- Use **selectors** for derived state
-
-```typescript
-// Good: Focused store with proper error handling
-interface TemplateStore {
-  templates: EmailTemplate[];
-  loading: boolean;
-  error: string | null;
-  selectedTemplateId: string | null;
-  
-  // Actions
-  fetchTemplates: () => Promise<void>;
-  selectTemplate: (id: string) => void;
-  clearError: () => void;
-}
-
-export const useTemplateStore = create<TemplateStore>((set, get) => ({
-  templates: [],
-  loading: false,
-  error: null,
-  selectedTemplateId: null,
-
-  fetchTemplates: async () => {
-    try {
-      set({ loading: true, error: null });
-      const templates = await api.getTemplates();
-      set({ templates, loading: false });
-    } catch (error) {
-      set({ 
-        error: error instanceof Error ? error.message : 'Failed to fetch templates',
-        loading: false 
-      });
-    }
-  },
-
-  selectTemplate: (id) => set({ selectedTemplateId: id }),
-  
-  clearError: () => set({ error: null }),
-}));
-
-// Good: Selector for derived state
-export const useSelectedTemplate = () => {
-  const { templates, selectedTemplateId } = useTemplateStore();
-  return useMemo(() => 
-    templates.find(t => t.id === selectedTemplateId),
-    [templates, selectedTemplateId]
-  );
-};
+#### **Frontend Environment**
+Create `apps/web/.env.local`:
+```env
+VITE_API_BASE_URL=http://localhost:3001
+VITE_WS_URL=ws://localhost:3001
+VITE_APP_NAME=Craftify Email
 ```
 
-#### React Query Integration
-- Use **proper query keys** for caching
-- Implement **optimistic updates**
-- Handle **loading and error states**
-- Use **mutation hooks** for data changes
-
-```typescript
-// Good: React Query with proper keys and optimistic updates
-export function useTemplates(filters: TemplateFilters) {
-  return useQuery({
-    queryKey: ['templates', filters],
-    queryFn: () => api.getTemplates(filters),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-}
-
-export function useCreateTemplate() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: api.createTemplate,
-    onSuccess: (newTemplate) => {
-      // Optimistic update
-      queryClient.setQueryData(['templates'], (old: EmailTemplate[] = []) => [
-        ...old,
-        newTemplate
-      ]);
-      
-      // Invalidate and refetch
-      queryClient.invalidateQueries({ queryKey: ['templates'] });
-    },
-  });
-}
+#### **Backend Environment**
+Create `apps/api/.env.local`:
+```env
+PORT=3001
+NODE_ENV=development
+CORS_ORIGIN=http://localhost:8080
+JWT_SECRET=your-secret-key
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
 ```
 
-### Component Development
+## 🖥️ **Running the Applications**
 
-#### Component Structure
-- Use **consistent file organization**
-- Implement **proper prop interfaces**
-- Add **JSDoc comments** for complex components
-- Use **Storybook** for component documentation (planned)
+### **Start Frontend Development Server**
+```bash
+# From root directory
+npm run dev --workspace=apps/web
 
+# Or from apps/web directory
+cd apps/web
+npm run dev
+```
+
+**Frontend will be available at**: http://localhost:8080
+
+### **Start Backend API Server**
+```bash
+# From root directory
+npm run dev --workspace=apps/api
+
+# Or from apps/api directory
+cd apps/api
+npm run dev
+```
+
+**API will be available at**: http://localhost:3001
+
+### **Start Both Simultaneously**
+```bash
+# From root directory
+npm run dev
+```
+
+This will start both frontend and backend in parallel.
+
+## 📚 **API Development with Swagger**
+
+### **Swagger Documentation**
+The API includes comprehensive Swagger/OpenAPI documentation:
+
+- **Swagger UI**: http://localhost:3001/api-docs
+- **OpenAPI JSON**: http://localhost:3001/api-docs/swagger.json
+
+### **Adding New API Endpoints**
+
+#### **1. Create Route Handler**
 ```typescript
-// components/ui/button/Button.tsx
-import React from 'react';
-import { cn } from '@/lib/utils';
-import { buttonVariants } from './buttonVariants';
-import type { ButtonProps } from './Button.types';
+// apps/api/src/routes/templates.ts
+import { Router } from 'express';
+
+const router = Router();
 
 /**
- * Button component with multiple variants and sizes
- * 
- * @example
- * ```tsx
- * <Button variant="primary" size="lg" onClick={handleClick}>
- *   Click me
- * </Button>
- * ```
+ * @swagger
+ * /api/templates:
+ *   get:
+ *     summary: Get all templates
+ *     description: Retrieve a list of email templates
+ *     tags: [Templates]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: domain
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Domain identifier
+ *     responses:
+ *       200:
+ *         description: List of templates retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/EmailTemplate'
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
-export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'default', size = 'default', ...props }, ref) => {
-    return (
-      <button
-        className={cn(buttonVariants({ variant, size, className }))}
-        ref={ref}
-        {...props}
-      />
-    );
-  }
-);
-
-Button.displayName = 'Button';
-```
-
-#### Error Boundaries
-- Implement **error boundaries** for component trees
-- Provide **user-friendly error messages**
-- Log errors for **monitoring and debugging**
-- Offer **recovery options** when possible
-
-```typescript
-// components/ErrorBoundary.tsx
-import React, { Component, ErrorInfo, ReactNode } from 'react';
-
-interface Props {
-  children: ReactNode;
-  fallback?: ReactNode;
-}
-
-interface State {
-  hasError: boolean;
-  error?: Error;
-}
-
-export class ErrorBoundary extends Component<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Error caught by boundary:', error, errorInfo);
-    // Log to error reporting service
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return this.props.fallback || (
-        <div className="p-4 text-center">
-          <h2 className="text-lg font-semibold text-red-600">
-            Something went wrong
-          </h2>
-          <p className="text-gray-600 mt-2">
-            We're sorry, but something unexpected happened.
-          </p>
-          <button
-            onClick={() => this.setState({ hasError: false })}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Try again
-          </button>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
-```
-
-## Testing Strategy
-
-### Unit Testing
-
-#### Component Testing
-- Test **component rendering** and props
-- Test **user interactions** and events
-- Test **conditional rendering** and state changes
-- Test **accessibility** features
-
-```typescript
-// __tests__/components/TemplateCard.test.tsx
-import { render, screen, fireEvent } from '@testing-library/react';
-import { TemplateCard } from '@/components/TemplateCard';
-import { mockTemplate } from '@/test/mocks';
-
-describe('TemplateCard', () => {
-  const defaultProps = {
-    template: mockTemplate,
-    onSelect: jest.fn(),
-    onAction: jest.fn(),
-  };
-
-  it('renders template information correctly', () => {
-    render(<TemplateCard {...defaultProps} />);
-    
-    expect(screen.getByText(mockTemplate.name)).toBeInTheDocument();
-    expect(screen.getByText(mockTemplate.subject)).toBeInTheDocument();
-    expect(screen.getByText(mockTemplate.status)).toBeInTheDocument();
-  });
-
-  it('calls onSelect when checkbox is clicked', () => {
-    render(<TemplateCard {...defaultProps} />);
-    
-    const checkbox = screen.getByRole('checkbox');
-    fireEvent.click(checkbox);
-    
-    expect(defaultProps.onSelect).toHaveBeenCalledWith(mockTemplate.id, true);
-  });
-
-  it('calls onAction when action button is clicked', () => {
-    render(<TemplateCard {...defaultProps} />);
-    
-    const editButton = screen.getByLabelText('Edit template');
-    fireEvent.click(editButton);
-    
-    expect(defaultProps.onAction).toHaveBeenCalledWith('edit', mockTemplate);
-  });
-
-  it('applies correct status styling', () => {
-    render(<TemplateCard {...defaultProps} />);
-    
-    const statusBadge = screen.getByText(mockTemplate.status);
-    expect(statusBadge).toHaveClass('bg-yellow-100', 'text-yellow-800');
-  });
-});
-```
-
-#### Hook Testing
-- Test **hook logic** and state changes
-- Test **async operations** and side effects
-- Test **error handling** and edge cases
-- Use **@testing-library/react-hooks** for complex hooks
-
-```typescript
-// __tests__/hooks/useTemplate.test.ts
-import { renderHook, waitFor } from '@testing-library/react';
-import { useTemplate } from '@/hooks/useTemplate';
-import { api } from '@/lib/api';
-
-// Mock API
-jest.mock('@/lib/api');
-
-describe('useTemplate', () => {
-  const mockTemplate = { id: '1', name: 'Test Template' };
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('fetches template on mount', async () => {
-    (api.getTemplate as jest.Mock).mockResolvedValue(mockTemplate);
-
-    const { result } = renderHook(() => useTemplate('1'));
-
-    expect(result.current.loading).toBe(true);
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false);
+router.get('/', async (req, res) => {
+  try {
+    // Implementation here
+    res.json({
+      success: true,
+      data: [],
+      meta: {
+        timestamp: new Date().toISOString(),
+        requestId: generateRequestId()
+      }
     });
-
-    expect(result.current.template).toEqual(mockTemplate);
-    expect(result.current.error).toBeNull();
-  });
-
-  it('handles API errors gracefully', async () => {
-    const error = new Error('API Error');
-    (api.getTemplate as jest.Mock).mockRejectedValue(error);
-
-    const { result } = renderHook(() => useTemplate('1'));
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to retrieve templates',
+        details: error.message
+      }
     });
-
-    expect(result.current.error).toBe('API Error');
-    expect(result.current.template).toBeNull();
-  });
+  }
 });
+
+export default router;
 ```
 
-### Integration Testing
-
-#### API Integration
-- Test **API endpoints** with real HTTP requests
-- Test **authentication** and authorization
-- Test **error responses** and edge cases
-- Use **MSW** (Mock Service Worker) for API mocking
-
+#### **2. Register Route in Main Router**
 ```typescript
-// __tests__/integration/api.test.ts
-import { rest } from 'msw';
-import { setupServer } from 'msw/node';
-import { render, screen, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { TemplateList } from '@/components/TemplateList';
+// apps/api/src/routes/index.ts
+import templateRoutes from './templates';
 
-const server = setupServer(
-  rest.get('/api/templates', (req, res, ctx) => {
-    return res(
-      ctx.json({
-        success: true,
-        data: [
-          { id: '1', name: 'Template 1', status: 'approved' },
-          { id: '2', name: 'Template 2', status: 'draft' },
-        ],
-      })
-    );
-  })
-);
+// ... existing code ...
 
-beforeAll(() => server.listen());
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
-
-describe('TemplateList API Integration', () => {
-  it('loads and displays templates from API', async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <TemplateList />
-      </QueryClientProvider>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Template 1')).toBeInTheDocument();
-      expect(screen.getByText('Template 2')).toBeInTheDocument();
-    });
-  });
-});
+router.use('/templates', templateRoutes);
 ```
 
-### E2E Testing (Planned)
-
-#### Playwright Setup
-- Test **complete user workflows**
-- Test **cross-browser compatibility**
-- Test **responsive design** and mobile interactions
-- Test **performance** and accessibility
-
+#### **3. Add Schema Definitions**
 ```typescript
-// e2e/tests/template-creation.spec.ts
-import { test, expect } from '@playwright/test';
+// apps/api/src/config/swagger.ts
+// Add to the components.schemas section:
 
-test.describe('Template Creation', () => {
-  test('user can create a new template', async ({ page }) => {
-    await page.goto('/templates');
-    
-    // Click create button
-    await page.click('[data-testid="create-template-button"]');
-    
-    // Fill form
-    await page.fill('[data-testid="template-name"]', 'Test Template');
-    await page.fill('[data-testid="template-subject"]', 'Test Subject');
-    await page.fill('[data-testid="template-content"]', 'Test content');
-    
-    // Submit form
-    await page.click('[data-testid="save-template-button"]');
-    
-    // Verify success
-    await expect(page.locator('[data-testid="success-message"]')).toBeVisible();
-    
-    // Verify template appears in list
-    await expect(page.locator('text=Test Template')).toBeVisible();
-  });
-});
-```
-
-## Code Quality
-
-### Linting and Formatting
-
-#### ESLint Configuration
-- **Strict rules** for code quality
-- **TypeScript-aware** linting
-- **React-specific** rules and hooks
-- **Accessibility** linting rules
-
-```json
-// .eslintrc.json
-{
-  "extends": [
-    "@eslint/js",
-    "typescript-eslint",
-    "plugin:react-hooks/recommended",
-    "plugin:jsx-a11y/recommended"
-  ],
-  "rules": {
-    "@typescript-eslint/no-unused-vars": "error",
-    "@typescript-eslint/explicit-function-return-type": "warn",
-    "react-hooks/rules-of-hooks": "error",
-    "react-hooks/exhaustive-deps": "warn",
-    "jsx-a11y/alt-text": "error",
-    "jsx-a11y/click-events-have-key-events": "error"
+EmailTemplate: {
+  type: 'object',
+  properties: {
+    id: {
+      type: 'string',
+      example: 'template_123'
+    },
+    name: {
+      type: 'string',
+      example: 'Welcome Email'
+    },
+    // ... other properties
   }
 }
 ```
 
-#### Prettier Configuration
-- **Consistent formatting** across the project
-- **Editor integration** for automatic formatting
-- **Git hooks** for pre-commit formatting
+### **Testing API Endpoints**
 
-```json
-// .prettierrc
-{
-  "semi": true,
-  "trailingComma": "es5",
-  "singleQuote": true,
-  "printWidth": 80,
-  "tabWidth": 2,
-  "useTabs": false
-}
-```
+#### **Using Swagger UI**
+1. Open http://localhost:3001/api-docs
+2. Click on any endpoint
+3. Click "Try it out"
+4. Fill in parameters and click "Execute"
 
-### Git Workflow
-
-#### Branch Naming
-- `feature/feature-name` - New features
-- `bugfix/bug-description` - Bug fixes
-- `hotfix/urgent-fix` - Critical fixes
-- `chore/task-description` - Maintenance tasks
-
-#### Commit Messages
-Follow **Conventional Commits** specification:
-
-```
-type(scope): description
-
-[optional body]
-
-[optional footer]
-```
-
-Examples:
+#### **Using cURL**
 ```bash
-feat(templates): add bulk delete functionality
+# Health check
+curl http://localhost:3001/health
 
-feat(editor): implement variable insertion panel
+# API info
+curl http://localhost:3001/api
 
-fix(auth): resolve token refresh issue
-
-docs(readme): update installation instructions
-
-chore(deps): update dependencies to latest versions
+# Test with authentication (when implemented)
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+     http://localhost:3001/api/templates?domain=marketing
 ```
 
-#### Pull Request Process
-1. **Create feature branch** from main
-2. **Implement changes** with tests
-3. **Update documentation** as needed
-4. **Create pull request** with description
-5. **Code review** and address feedback
-6. **Merge** after approval
+#### **Using Postman**
+1. Import the OpenAPI specification from `/api-docs/swagger.json`
+2. Set up environment variables
+3. Test endpoints with the collection
 
-## Performance Optimization
+## 🎨 **Frontend Development**
 
-### Bundle Optimization
+### **Component Development**
 
-#### Code Splitting
-- **Route-based** lazy loading
-- **Component-based** lazy loading
-- **Dynamic imports** for heavy features
-
+#### **Creating New Components**
 ```typescript
-// Lazy load routes
-const Templates = lazy(() => import('@/pages/Templates'));
-const Approvals = lazy(() => import('@/pages/Approvals'));
+// apps/web/src/components/ui/MyComponent.tsx
+import React from 'react';
+import { cn } from '@/lib/utils';
 
-// Lazy load heavy components
-const TemplateEditor = lazy(() => import('@/components/editor/TemplateEditor'));
-```
+interface MyComponentProps {
+  className?: string;
+  children?: React.ReactNode;
+}
 
-#### Tree Shaking
-- Use **ES modules** for imports
-- Avoid **side effects** in modules
-- Use **named exports** instead of default exports
-
-```typescript
-// Good: Named exports for tree shaking
-export { Button } from './Button';
-export { Input } from './Input';
-export { Select } from './Select';
-
-// Avoid: Default exports
-export default { Button, Input, Select };
-```
-
-### Runtime Performance
-
-#### Memoization
-- **React.memo** for expensive components
-- **useMemo** for computed values
-- **useCallback** for event handlers
-- **Zustand selectors** for store optimization
-
-```typescript
-// Good: Memoized expensive component
-const ExpensiveChart = React.memo(({ data }: ChartProps) => {
-  const processedData = useMemo(() => 
-    processChartData(data),
-    [data]
-  );
-
-  const handleClick = useCallback((point) => {
-    // Handle click
-  }, []);
-
-  return <Chart data={processedData} onClick={handleClick} />;
-});
-
-// Good: Optimized store selector
-export const useFilteredTemplates = (filters: TemplateFilters) => {
-  return useTemplateStore(
-    useCallback(
-      (state) => filterTemplates(state.templates, filters),
-      [filters]
-    )
-  );
-};
-```
-
-#### Virtual Scrolling
-- Implement **virtual scrolling** for large lists
-- Use **react-window** or **react-virtualized**
-- Optimize **rendering performance** for thousands of items
-
-```typescript
-// Virtual scrolling for large template lists
-import { FixedSizeList as List } from 'react-window';
-
-const VirtualizedTemplateList = ({ templates }: { templates: EmailTemplate[] }) => {
-  const Row = ({ index, style }: { index: number; style: CSSProperties }) => (
-    <div style={style}>
-      <TemplateCard template={templates[index]} />
+export const MyComponent: React.FC<MyComponentProps> = ({
+  className,
+  children
+}) => {
+  return (
+    <div className={cn("base-styles", className)}>
+      {children}
     </div>
   );
-
-  return (
-    <List
-      height={600}
-      itemCount={templates.length}
-      itemSize={120}
-      width="100%"
-    >
-      {Row}
-    </List>
-  );
 };
 ```
 
-## Debugging and Monitoring
+#### **Using Shadcn/ui Components**
+```bash
+# Add new components from shadcn/ui
+cd apps/web
+npx shadcn@latest add [component-name]
+```
 
-### Development Tools
+### **State Management**
 
-#### React DevTools
-- **Component inspection** and state debugging
-- **Performance profiling** and optimization
-- **Hook debugging** and state tracking
-
-#### Redux DevTools (Zustand)
-- **State inspection** and time-travel debugging
-- **Action logging** and performance monitoring
-- **State persistence** for debugging
-
-### Error Monitoring
-
-#### Error Boundaries
-- **Graceful error handling** for component trees
-- **User-friendly error messages**
-- **Error reporting** to monitoring services
-
-#### Logging Strategy
-- **Structured logging** with consistent format
-- **Error tracking** with context information
-- **Performance monitoring** and metrics
-
+#### **Creating Zustand Store**
 ```typescript
-// Logger utility
-export const logger = {
-  info: (message: string, context?: Record<string, any>) => {
-    console.log(`[INFO] ${message}`, context);
-  },
-  
-  error: (message: string, error?: Error, context?: Record<string, any>) => {
-    console.error(`[ERROR] ${message}`, error, context);
+// apps/web/src/store/useMyStore.ts
+import { create } from 'zustand';
+import { devtools } from 'zustand/middleware';
+
+interface MyState {
+  data: any[];
+  loading: boolean;
+  fetchData: () => Promise<void>;
+}
+
+export const useMyStore = create<MyState>()(
+  devtools(
+    (set, get) => ({
+      data: [],
+      loading: false,
+      fetchData: async () => {
+        set({ loading: true });
+        try {
+          // API call here
+          const response = await fetch('/api/data');
+          const data = await response.json();
+          set({ data: data.data, loading: false });
+        } catch (error) {
+          set({ loading: false });
+          console.error('Failed to fetch data:', error);
+        }
+      },
+    }),
+    { name: 'my-store' }
+  )
+);
+```
+
+### **API Integration**
+
+#### **Creating API Hooks**
+```typescript
+// apps/web/src/hooks/useApi.ts
+import { useState, useEffect } from 'react';
+
+interface UseApiOptions<T> {
+  url: string;
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  body?: any;
+  headers?: Record<string, string>;
+}
+
+export function useApi<T>({ url, method = 'GET', body, headers }: UseApiOptions<T>) {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const execute = async () => {
+    setLoading(true);
+    setError(null);
     
-    // Send to error monitoring service
-    if (process.env.NODE_ENV === 'production') {
-      // Sentry.captureException(error, { extra: context });
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers,
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      setData(result.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
     }
-  },
-  
-  warn: (message: string, context?: Record<string, any>) => {
-    console.warn(`[WARN] ${message}`, context);
-  },
-};
+  };
+
+  useEffect(() => {
+    if (method === 'GET') {
+      execute();
+    }
+  }, [url]);
+
+  return { data, loading, error, execute };
+}
 ```
 
-## Deployment and CI/CD
+## 🧪 **Testing**
 
-### Build Process
+### **Running Tests**
 
-#### Development Build
+#### **Frontend Tests**
 ```bash
-npm run build:dev
+cd apps/web
+npm test                    # Run tests in watch mode
+npm run test:coverage      # Run tests with coverage
+npm run test:ci            # Run tests once for CI
 ```
 
-#### Production Build
+#### **Backend Tests**
 ```bash
+cd apps/api
+npm test                    # Run tests in watch mode
+npm run test:coverage      # Run tests with coverage
+npm run test:ci            # Run tests once for CI
+```
+
+### **Writing Tests**
+
+#### **Frontend Component Test**
+```typescript
+// apps/web/src/components/__tests__/MyComponent.test.tsx
+import { render, screen } from '@testing-library/react';
+import { MyComponent } from '../MyComponent';
+
+describe('MyComponent', () => {
+  it('renders correctly', () => {
+    render(<MyComponent>Test Content</MyComponent>);
+    expect(screen.getByText('Test Content')).toBeInTheDocument();
+  });
+});
+```
+
+#### **Backend API Test**
+```typescript
+// apps/api/src/routes/__tests__/templates.test.ts
+import request from 'supertest';
+import app from '../../index';
+
+describe('GET /api/templates', () => {
+  it('should return templates list', async () => {
+    const response = await request(app)
+      .get('/api/templates')
+      .expect(200);
+
+    expect(response.body.success).toBe(true);
+    expect(Array.isArray(response.body.data)).toBe(true);
+  });
+});
+```
+
+## 🔍 **Debugging**
+
+### **Frontend Debugging**
+
+#### **React Developer Tools**
+- Install React Developer Tools browser extension
+- Use Components tab to inspect component hierarchy
+- Use Profiler tab to analyze performance
+
+#### **Console Logging**
+```typescript
+// Use console.log for debugging
+console.log('Component rendered with props:', props);
+
+// Use console.group for grouped logs
+console.group('API Response');
+console.log('Status:', response.status);
+console.log('Data:', response.data);
+console.groupEnd();
+```
+
+### **Backend Debugging**
+
+#### **Node.js Debugger**
+```bash
+# Start with debugger
+cd apps/api
+node --inspect src/index.ts
+
+# Or use tsx with debugging
+npx tsx --inspect src/index.ts
+```
+
+#### **Logging**
+```typescript
+// Use the logger utility
+import { logger } from '../utils/logger';
+
+logger.info('Request received', { path: req.path, method: req.method });
+logger.error('Database connection failed', { error: err.message });
+logger.debug('Processing template', { templateId: req.params.id });
+```
+
+## 📦 **Building for Production**
+
+### **Build All Packages**
+```bash
+# From root directory
+npm run build:all
+
+# This will build:
+# - packages/shared
+# - apps/web
+# - apps/api
+```
+
+### **Build Individual Packages**
+```bash
+# Build shared package
+npm run build --workspace=packages/shared
+
+# Build web app
+npm run build --workspace=apps/web
+
+# Build API
+npm run build --workspace=apps/api
+```
+
+### **Production Builds**
+
+#### **Frontend Production Build**
+```bash
+cd apps/web
 npm run build
 ```
 
-#### Build Optimization
-- **Code splitting** and lazy loading
-- **Tree shaking** and dead code elimination
-- **Asset optimization** and compression
-- **Source maps** for debugging
+The built files will be in `apps/web/dist/` and ready for deployment.
 
-### Environment Configuration
-
-#### Environment Variables
+#### **Backend Production Build**
 ```bash
-# .env.development
-VITE_API_BASE_URL=http://localhost:3001
-VITE_APP_ENV=development
-
-# .env.production
-VITE_API_BASE_URL=https://api.craftify-email.com
-VITE_APP_ENV=production
+cd apps/api
+npm run build
+npm start
 ```
 
-#### Build Configuration
-```typescript
-// vite.config.ts
-export default defineConfig(({ mode }) => ({
-  define: {
-    __APP_VERSION__: JSON.stringify(process.env.npm_package_version),
-    __APP_ENV__: JSON.stringify(mode),
-  },
-  
-  build: {
-    target: 'es2015',
-    minify: 'terser',
-    sourcemap: mode === 'development',
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
-        },
-      },
-    },
-  },
-}));
+## 🚀 **Deployment**
+
+### **Frontend Deployment**
+```bash
+# Build the application
+cd apps/web
+npm run build
+
+# Deploy dist/ folder to your hosting service
+# Examples: Vercel, Netlify, AWS S3, etc.
 ```
 
-### CI/CD Pipeline (Planned)
+### **Backend Deployment**
+```bash
+# Build the application
+cd apps/api
+npm run build
 
-#### GitHub Actions
-```yaml
-# .github/workflows/ci.yml
-name: CI/CD Pipeline
+# Start production server
+npm start
 
-on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-          cache: 'npm'
-      
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run type-check
-      - run: npm run test:coverage
-      
-      - uses: codecov/codecov-action@v3
-        with:
-          file: ./coverage/lcov.info
+# Or use PM2 for process management
+pm2 start dist/index.js --name "craftify-api"
 ```
 
-## Troubleshooting
+## 🔧 **Development Scripts**
 
-### Common Issues
+### **Available Scripts**
 
-#### Build Errors
-- **TypeScript errors** - Check type definitions and imports
-- **Dependency conflicts** - Clear node_modules and reinstall
-- **Environment variables** - Verify .env file configuration
-
-#### Runtime Errors
-- **State management issues** - Check Zustand store implementation
-- **API integration** - Verify endpoint URLs and authentication
-- **Component rendering** - Check prop types and required props
-
-#### Performance Issues
-- **Bundle size** - Analyze with webpack-bundle-analyzer
-- **Rendering performance** - Use React DevTools Profiler
-- **Memory leaks** - Check useEffect cleanup and event listeners
-
-### Getting Help
-
-- **Documentation** - Check this guide and component docs
-- **Issues** - Search existing GitHub issues
-- **Discussions** - Use GitHub Discussions for questions
-- **Code Review** - Request help during pull request reviews
-
-## Contributing Guidelines
-
-### Code Review Checklist
-
-- [ ] **Functionality** - Does the code work as intended?
-- [ ] **Testing** - Are there adequate tests?
-- [ ] **Documentation** - Is the code well-documented?
-- [ ] **Performance** - Are there any performance concerns?
-- [ ] **Accessibility** - Does the code follow accessibility guidelines?
-- [ ] **Security** - Are there any security vulnerabilities?
-- [ ] **Code Style** - Does the code follow project conventions?
-
-### Pull Request Template
-
-```markdown
-## Description
-Brief description of changes
-
-## Type of Change
-- [ ] Bug fix
-- [ ] New feature
-- [ ] Breaking change
-- [ ] Documentation update
-
-## Testing
-- [ ] Unit tests pass
-- [ ] Integration tests pass
-- [ ] Manual testing completed
-
-## Screenshots (if applicable)
-Add screenshots for UI changes
-
-## Checklist
-- [ ] Code follows project style guidelines
-- [ ] Self-review completed
-- [ ] Documentation updated
-- [ ] No console errors or warnings
+#### **Root Level Scripts**
+```bash
+npm run dev              # Start both frontend and backend
+npm run build:all        # Build all packages
+npm run install:all      # Install dependencies for all workspaces
+npm run clean:all        # Clean build artifacts from all workspaces
+npm run lint:all         # Lint all packages
+npm run test:all         # Run tests for all packages
 ```
 
-### Review Process
+#### **Frontend Scripts**
+```bash
+npm run dev --workspace=apps/web      # Start development server
+npm run build --workspace=apps/web    # Build for production
+npm run preview --workspace=apps/web  # Preview production build
+npm run lint --workspace=apps/web     # Lint code
+npm run test --workspace=apps/web     # Run tests
+```
 
-1. **Self-review** your changes before submitting
-2. **Request review** from appropriate team members
-3. **Address feedback** promptly and thoroughly
-4. **Resolve conflicts** and update branch as needed
-5. **Merge** only after approval and CI checks pass
+#### **Backend Scripts**
+```bash
+npm run dev --workspace=apps/api      # Start development server
+npm run build --workspace=apps/api    # Build for production
+npm run start --workspace=apps/api    # Start production server
+npm run lint --workspace=apps/api     # Lint code
+npm run test --workspace=apps/api     # Run tests
+```
 
-## Resources
+## 📚 **Useful Commands**
 
-### Documentation
+### **Workspace Management**
+```bash
+# Run command in specific workspace
+npm run dev --workspace=apps/web
+npm run build --workspace=apps/api
+
+# Install package in specific workspace
+npm install lodash --workspace=apps/web
+npm install express --workspace=apps/api
+
+# Run command in all workspaces
+npm run lint --workspaces
+npm run test --workspaces
+```
+
+### **Dependency Management**
+```bash
+# Check for outdated packages
+npm outdated
+
+# Update packages
+npm update
+
+# Audit for security vulnerabilities
+npm audit
+npm audit fix
+```
+
+## 🐛 **Common Issues & Solutions**
+
+### **Build Issues**
+
+#### **TypeScript Compilation Errors**
+```bash
+# Clean and rebuild
+npm run clean:all
+npm run build:all
+```
+
+#### **Dependency Issues**
+```bash
+# Clear npm cache
+npm cache clean --force
+
+# Remove node_modules and reinstall
+rm -rf node_modules
+rm -rf apps/*/node_modules
+rm -rf packages/*/node_modules
+npm install
+```
+
+### **Runtime Issues**
+
+#### **Port Already in Use**
+```bash
+# Find process using port
+lsof -i :3001
+lsof -i :8080
+
+# Kill process
+kill -9 <PID>
+```
+
+#### **WebSocket Connection Issues**
+- Check if backend is running
+- Verify WebSocket server is initialized
+- Check browser console for connection errors
+
+## 📖 **Additional Resources**
+
+### **Documentation**
+- [Project README](../README.md) - Project overview and setup
+- [API Documentation](./api.md) - Complete API reference
+- [Architecture Guide](./architecture.md) - System architecture details
+- [Contributing Guide](./contributing.md) - How to contribute
+
+### **External Resources**
 - [React Documentation](https://react.dev/)
 - [TypeScript Handbook](https://www.typescriptlang.org/docs/)
+- [Express.js Guide](https://expressjs.com/)
 - [Tailwind CSS Documentation](https://tailwindcss.com/docs)
+- [Shadcn/ui Components](https://ui.shadcn.com/)
+
+### **Development Tools**
+- [Vite Documentation](https://vitejs.dev/)
 - [Zustand Documentation](https://github.com/pmndrs/zustand)
-- [React Query Documentation](https://tanstack.com/query/latest)
+- [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/)
+- [Jest Documentation](https://jestjs.io/docs/getting-started)
 
-### Tools and Libraries
-- [Vite](https://vitejs.dev/) - Build tool
-- [Shadcn/ui](https://ui.shadcn.com/) - Component library
-- [Radix UI](https://www.radix-ui.com/) - UI primitives
-- [React Hook Form](https://react-hook-form.com/) - Form handling
-- [Zod](https://zod.dev/) - Schema validation
+## 🎯 **Next Steps**
 
-### Best Practices
-- [React Best Practices](https://react.dev/learn)
-- [TypeScript Best Practices](https://www.typescriptlang.org/docs/)
-- [Accessibility Guidelines](https://www.w3.org/WAI/WCAG21/quickref/)
-- [Performance Best Practices](https://web.dev/performance/) 
+1. **Complete API Implementation**: Finish template CRUD operations
+2. **Add Authentication**: Implement JWT-based authentication
+3. **Database Integration**: Connect to DynamoDB
+4. **Frontend-Backend Integration**: Connect React app to API
+5. **Testing**: Add comprehensive test coverage
+6. **Deployment**: Set up production deployment pipeline
+
+The development environment is now fully set up with hot reloading, comprehensive documentation, and a solid foundation for building features. You can start developing immediately with the working frontend and backend infrastructure. 
