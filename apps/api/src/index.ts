@@ -28,8 +28,6 @@
  */
 
 import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
@@ -120,7 +118,7 @@ securityManager.applySecurityMiddleware(app);
 app.use(compression()); // Enable gzip compression for responses
 app.use(express.json({ 
   limit: '10mb', // Maximum request body size
-  verify: (req, res, buf) => {
+  verify: (req, buf) => {
     // Store raw body for signature verification if needed
     (req as any).rawBody = buf;
   }
@@ -338,10 +336,10 @@ process.on('uncaughtException', (error) => {
 });
 
 // Handle unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled Promise Rejection', reason, {
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled Promise Rejection', reason as Error, {
     errorType: 'unhandledRejection',
-    promise: promise.toString(),
+    promise: String(reason),
     timestamp: new Date().toISOString()
   });
   
@@ -388,7 +386,7 @@ async function gracefulShutdown(): Promise<void> {
     // Exit process
     process.exit(0);
   } catch (error) {
-    logger.error('Error during graceful shutdown', error, {
+    logger.error('Error during graceful shutdown', error as Error, {
       phase: 'shutdown-error',
       timestamp: new Date().toISOString()
     });
@@ -423,7 +421,7 @@ function parseMorganLog(message: string): any {
     
     return { rawMessage: message.trim() };
   } catch (error) {
-    return { rawMessage: message.trim(), parseError: error.message };
+    return { rawMessage: message.trim(), parseError: (error as Error).message };
   }
 }
 

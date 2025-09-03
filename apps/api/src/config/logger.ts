@@ -16,7 +16,7 @@
 
 import winston from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response } from 'express';
 
 /**
  * Log levels configuration
@@ -61,7 +61,7 @@ export interface LogMetadata {
  * Provides structured logging with multiple transports
  */
 class Logger {
-  private logger: winston.Logger;
+  private logger!: winston.Logger;
   private environment: string;
   private serviceName: string;
   private serviceVersion: string;
@@ -105,7 +105,7 @@ class Logger {
           datePattern: 'YYYY-MM-DD',
           level: LogLevel.ERROR,
           maxSize: '20m',
-          maxFiles: '14d',
+          maxFiles: 14,
           format: winston.format.combine(
             winston.format.timestamp(),
             winston.format.json()
@@ -119,7 +119,7 @@ class Logger {
           filename: 'logs/combined-%DATE%.log',
           datePattern: 'YYYY-MM-DD',
           maxSize: '20m',
-          maxFiles: '30d',
+          maxFiles: 30,
           format: winston.format.combine(
             winston.format.timestamp(),
             winston.format.json()
@@ -145,7 +145,7 @@ class Logger {
           filename: 'logs/exceptions-%DATE%.log',
           datePattern: 'YYYY-MM-DD',
           maxSize: '20m',
-          maxFiles: '14d'
+          maxFiles: 14
         })
       ],
       rejectionHandlers: [
@@ -153,7 +153,7 @@ class Logger {
           filename: 'logs/rejections-%DATE%.log',
           datePattern: 'YYYY-MM-DD',
           maxSize: '20m',
-          maxFiles: '14d'
+          maxFiles: 14
         })
       ]
     });
@@ -272,7 +272,7 @@ class Logger {
     const metadata = this.createMetadata(LogLevel.HTTP, 'API Request', {
       requestId: req.headers['x-request-id'] || req.headers['x-correlation-id'],
       userId: (req as any).user?.id,
-      sessionId: req.sessionID,
+      sessionId: (req as any).sessionID,
       ipAddress: req.ip || req.connection.remoteAddress,
       userAgent: req.get('User-Agent'),
       endpoint: req.originalUrl,
@@ -376,7 +376,4 @@ class Logger {
 export const logger = new Logger();
 
 // Export the Logger class for testing and customization
-export { Logger };
-
-// Export types for external use
-export type { LogMetadata }; 
+export { Logger }; 
